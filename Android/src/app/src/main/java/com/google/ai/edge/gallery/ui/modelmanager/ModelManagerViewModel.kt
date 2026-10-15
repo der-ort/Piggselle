@@ -77,7 +77,6 @@ import com.google.ai.edge.gallery.proto.AccessTokenData
 import com.google.ai.edge.gallery.proto.HfModelItemProto
 import com.google.ai.edge.gallery.proto.ImportedModel
 import com.google.ai.edge.gallery.proto.Theme
-import com.google.ai.edge.gallery.runtime.aicore.AICoreModelDownloader
 import com.google.ai.edge.litertlm.Contents
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -258,7 +257,6 @@ constructor(
       mapOf(
         RuntimeType.UNKNOWN to LiteRtLmModelDownloader(context, downloadRepository),
         RuntimeType.LITERT_LM to LiteRtLmModelDownloader(context, downloadRepository),
-        RuntimeType.AICORE to AICoreModelDownloader(context),
       ),
   )
 

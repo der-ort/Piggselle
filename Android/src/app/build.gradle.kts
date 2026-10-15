@@ -117,9 +117,6 @@ dependencies {
   implementation(libs.litertlm)
   implementation(libs.commonmark)
   implementation(libs.richtext)
-  implementation(libs.tflite)
-  implementation(libs.tflite.gpu)
-  implementation(libs.tflite.support)
   implementation(libs.camerax.core)
   implementation(libs.camerax.camera2)
   implementation(libs.camerax.lifecycle)
@@ -145,13 +142,6 @@ dependencies {
   debugImplementation(libs.androidx.ui.tooling)
   debugImplementation(libs.androidx.ui.test.manifest)
   ksp(libs.moshi.kotlin.codegen)
-  implementation(libs.mlkit.genai.prompt)
-  implementation(libs.tasks.vision)
-  implementation(libs.tasks.retrieval)
-  implementation(libs.androidx.media3.exoplayer)
-  implementation(libs.androidx.media3.transformer)
-  implementation(libs.androidx.media3.ui)
-  implementation(libs.coil.compose)
 }
 
 configurations.all { resolutionStrategy.force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0") }

@@ -219,7 +219,6 @@ fun ModelItem(
                   unavailability = unavailability,
                   fallbackGuideUrl = model.learnMoreUrl,
                 )
-              model.autoDownloadsOnStartup && isDownloadFailed -> AICoreAccessPanel()
             }
             extraContent?.invoke()
           }

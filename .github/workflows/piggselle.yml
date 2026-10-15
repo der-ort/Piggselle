@@ -78,8 +78,20 @@ jobs:
           for pat in com/google/firebase com/google/android/gms/measurement io/ktor io/modelcontextprotocol; do
             if grep -rqa "L$pat/" "$RUNNER_TEMP/dex"; then BAD="$BAD $pat"; fi
           done
-          if [ -n "$BAD" ]; then echo "::error title=Telemetry found::$BAD"; exit 1; fi
+          if [ -n "$BAD" ]; then
+            DETAIL=$(grep -rhoa 'Lcom/google/firebase/[a-z]*/' "$RUNNER_TEMP/dex" | sort -u | tr '\n' ' ')
+            echo "::error title=Telemetry found::$BAD | $DETAIL"
+            cd "$GITHUB_WORKSPACE/Android/src" && ./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath | grep -B3 -i firebase | head -40 | tr '\n' '~' | sed 's/~/ ⏎ /g' | xargs -0 -I{} echo "::error title=Firebase dependency path::{}"
+            exit 1
+          fi
           echo "::notice title=No telemetry::No Firebase, Measurement, Ktor or MCP classes in the APK"
+          INFO=""
+          for pat in com/google/android/datatransport com/google/android/gms/clearcut com/google/android/gms/common/internal/service; do
+            if grep -rqa "L$pat/" "$RUNNER_TEMP/dex"; then INFO="$INFO $pat"; fi
+          done
+          echo "::notice title=Library telemetry code present (fenced)::${INFO:- none}"
+          MANIFEST=$($AAPT dump xmltree "$APK" --file AndroidManifest.xml | grep -c "datatransport" || true)
+          echo "::notice title=Datatransport manifest entries::$MANIFEST"
           TESTS=$(cat app/build/test-results/testDebugUnitTest/*.xml | grep -oE '<testsuite [^>]*' | sed -E 's/.*name="([^"]+)".*tests="([0-9]+)".*failures="([0-9]+)".*/\1: \2 tests, \3 failures/' | tr '\n' ';')
           echo "::notice title=Unit tests::$TESTS"
           echo "::notice title=APK::$(basename $APK) $(du -h $APK | cut -f1) sha256 $(cut -d' ' -f1 $APK.sha256)"

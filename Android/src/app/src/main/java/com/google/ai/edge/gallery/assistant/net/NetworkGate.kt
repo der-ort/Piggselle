@@ -22,8 +22,13 @@ import android.util.Log
 import com.google.ai.edge.gallery.assistant.storage.SecureStore
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.ProxySelector
+import java.net.SocketAddress
 import java.net.URI
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -114,6 +119,7 @@ object NetworkGate {
           },
         searxngBaseUrl = prefs.getString("searxng_base_url", "") ?: "",
       )
+    installProcessFence()
     logWriter.execute {
       val saved =
         SecureStore.read(appContext, LOG_FILE, ListSerializer(NetLogEntry.serializer()))
@@ -121,6 +127,65 @@ object NetworkGate {
       _log.update { current -> (current + saved).sortedByDescending { it.timeMs }.take(MAX_LOG_ENTRIES) }
     }
     initialized = true
+  }
+
+  // ---- Process-wide fence ---------------------------------------------------------------------
+
+  private val fenceLogged = ConcurrentHashMap<String, Long>()
+
+  /**
+   * Second line of defence for code that doesn't go through [open], such as telemetry uploaders
+   * bundled inside Google libraries (ML Kit / MediaPipe "datatransport"). Android's
+   * HttpURLConnection and OkHttp ask the default [ProxySelector] for every connection; any host
+   * that no enabled purpose may reach is pointed at a dead local proxy, so the connection fails
+   * before a single byte leaves the phone. Native code and raw sockets are not covered.
+   */
+  private fun installProcessFence() {
+    val previous = ProxySelector.getDefault()
+    ProxySelector.setDefault(
+      object : ProxySelector() {
+        override fun select(uri: URI?): MutableList<Proxy> {
+          val host = uri?.host?.lowercase()?.trimEnd('.')
+          if (host == null || fenceAllows(host)) {
+            return previous?.select(uri) ?: mutableListOf(Proxy.NO_PROXY)
+          }
+          val now = System.currentTimeMillis()
+          val last = fenceLogged[host] ?: 0L
+          if (now - last > 10 * 60_000L) {
+            fenceLogged[host] = now
+            Log.w(TAG, "Fence blocked connection to $host")
+            record(
+              uri.toString(),
+              NetPurpose.UNCLASSIFIED,
+              "CONNECT",
+              allowed = false,
+              reason = "Blocked by process fence (not opened through NetworkGate)",
+            )
+          }
+          return mutableListOf(Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved("127.0.0.1", 1)))
+        }
+
+        override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) {
+          previous?.connectFailed(uri, sa, ioe)
+        }
+      }
+    )
+  }
+
+  /** Hosts reachable at all right now: the union of what each enabled purpose may contact. */
+  private fun fenceAllows(host: String): Boolean {
+    if (host == "localhost" || host == "127.0.0.1" || host == "::1") return true
+    val p = _policy.value
+    if (p.killSwitch) return false
+    if ((p.isEnabled(NetPurpose.MODEL_DOWNLOAD) || p.isEnabled(NetPurpose.MODEL_CATALOG)) &&
+      HostPolicy.isModelHost(host)) {
+      return true
+    }
+    if (p.isEnabled(NetPurpose.WEB_SEARCH)) {
+      val searx = HostPolicy.parseBase(p.searxngBaseUrl)?.host?.lowercase()?.trimEnd('.')
+      if (searx != null && host == searx) return true
+    }
+    return false
   }
 
   // ---- Policy setters -------------------------------------------------------------------------
