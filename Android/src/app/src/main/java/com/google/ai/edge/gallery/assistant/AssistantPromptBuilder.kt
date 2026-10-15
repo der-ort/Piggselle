@@ -28,14 +28,23 @@ private const val MAX_MEMORIES = 60
 /** Builds the system prompt from the active persona, today's date, memories and tool rules. */
 object AssistantPromptBuilder {
 
+  /**
+   * @param instructionsOverride chat- or folder-level system prompt replacing the persona's
+   *   instructions. Blank or null keeps the persona's.
+   * @param includeMemories false in private chats: memories are neither shown nor suggested.
+   * @param knowledgeAvailable whether note excerpts may be attached to user messages.
+   */
   fun build(
     state: AssistantState,
     webSearchAvailable: Boolean,
     now: ZonedDateTime = ZonedDateTime.now(),
+    instructionsOverride: String? = null,
+    includeMemories: Boolean = true,
+    knowledgeAvailable: Boolean = false,
   ): String {
     val persona = state.activePersona
     val sb = StringBuilder()
-    sb.appendLine(persona.instructions.trim())
+    sb.appendLine((instructionsOverride?.takeIf { it.isNotBlank() } ?: persona.instructions).trim())
     sb.appendLine()
 
     if (persona.userName.isNotBlank()) {
@@ -46,7 +55,15 @@ object AssistantPromptBuilder {
     sb.appendLine("Right now it is $date (${now.zone.id}).")
     sb.appendLine()
 
-    if (state.memoryEnabled) {
+    if (knowledgeAvailable) {
+      sb.appendLine(
+        "Some of the user's messages start with excerpts from their own notes. Use them when " +
+          "they help, mention the file name when you rely on one, and never invent note content."
+      )
+      sb.appendLine()
+    }
+
+    if (includeMemories && state.memoryEnabled) {
       val memories = selectMemories(state)
       if (memories.isNotEmpty()) {
         sb.appendLine("Things the user asked you to remember (use them when relevant, don't recite them):")

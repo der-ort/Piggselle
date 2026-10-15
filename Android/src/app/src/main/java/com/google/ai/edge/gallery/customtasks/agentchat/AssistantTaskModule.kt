@@ -30,9 +30,7 @@ import com.google.ai.edge.gallery.assistant.data.AssistantRepository
 import com.google.ai.edge.gallery.assistant.net.NetPurpose
 import com.google.ai.edge.gallery.assistant.net.NetworkGate
 import com.google.ai.edge.gallery.assistant.tools.AssistantTools
-import com.google.ai.edge.gallery.assistant.ui.AssistantScreen
 import com.google.ai.edge.gallery.customtasks.common.CustomTask
-import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Category
 import com.google.ai.edge.gallery.data.Model
@@ -121,16 +119,8 @@ class AssistantTask(
     executor.cleanUp(onDone = onDone)
   }
 
-  @Composable
-  override fun MainScreen(data: Any) {
-    val myData = data as CustomTaskDataForBuiltinTask
-    AssistantScreen(
-      task = task,
-      modelManagerViewModel = myData.modelManagerViewModel,
-      navigateUp = myData.onNavUp,
-      initialQuery = myData.initialQuery,
-    )
-  }
+  // The chat UI lives in assistant/ui/chat; this task only owns model init and cleanup.
+  @Composable override fun MainScreen(data: Any) {}
 }
 
 @Module

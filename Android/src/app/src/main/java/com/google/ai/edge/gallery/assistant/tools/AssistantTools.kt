@@ -72,7 +72,10 @@ class AssistantTools @Inject constructor(private val repository: AssistantReposi
   val sendActionChannel: SendChannel<ToolAction> = channel
 
   private val webSearch = WebSearchTool(repository, fallbackActions = channel)
-  private val suggestMemory = SuggestMemoryTool(repository)
+  private val suggestMemory = SuggestMemoryTool(repository) { privateMode }
+
+  /** Set while a private chat is active: the memory tool then stores nothing. */
+  @Volatile var privateMode: Boolean = false
 
   override fun getAvailableTools(): List<ToolDefinition> = listOf(webSearch, suggestMemory)
 
@@ -203,7 +206,10 @@ class WebSearchTool(
     }
 }
 
-class SuggestMemoryTool(private val repository: AssistantRepository) : ToolDefinition {
+class SuggestMemoryTool(
+  private val repository: AssistantRepository,
+  private val isPrivate: () -> Boolean = { false },
+) : ToolDefinition {
   override val alwaysAllow: Boolean = true
   override var executionContext: ToolExecutionContext? = null
 
@@ -217,6 +223,9 @@ class SuggestMemoryTool(private val repository: AssistantRepository) : ToolDefin
     @ToolParam(description = "One short third-person sentence, e.g. 'Prefers tea over coffee.'")
     fact: String
   ): Map<String, String> {
+    if (isPrivate()) {
+      return mapOf("status" to "disabled", "message" to "This is a private chat. Nothing is remembered. Continue normally.")
+    }
     if (!repository.state.value.memoryEnabled) {
       return mapOf("status" to "disabled", "message" to "Memory is turned off. Continue normally.")
     }

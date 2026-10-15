@@ -58,26 +58,64 @@ report_and_fail() {
   exit 1
 }
 
+has_text() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+  adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
+  grep -qi "$1" "$OUT/ui.xml"
+}
+
+expect_text() {
+  for _ in $(seq 1 10); do has_text "$1" && return 0; sleep 2; done
+  echo "::error title=Smoke test::Expected to see '$1' on screen"
+  adb exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
+  exit 1
+}
+
 adb shell am start -W -n "$PKG/com.google.ai.edge.gallery.MainActivity" > /dev/null
 sleep 8
 crashed && report_and_fail "launch"
 
 tap_text "Accept & continue"
-sleep 6
+sleep 5
 crashed && report_and_fail "accepting the terms"
 
-# Home screen must render the assistant tile.
-tap_text "Piggselle" || true
-sleep 6
-crashed && report_and_fail "opening the assistant"
+# The app opens straight into the chat; without a model it offers a download.
+expect_text "Download a model to start"
 
+tap_text "Browse models"
+sleep 5
+crashed && report_and_fail "opening the model manager"
 adb shell input keyevent KEYCODE_BACK
 sleep 3
-crashed && report_and_fail "going back to home"
+crashed && report_and_fail "returning from the model manager"
+
+# Drawer -> new folder dialog -> cancel.
+tap_text "Chats"
+sleep 2
+expect_text "New chat"
+tap_text "New folder"
+sleep 2
+crashed && report_and_fail "opening the new folder dialog"
+tap_text "Cancel"
+sleep 2
+
+# Drawer -> settings -> knowledge base sheet.
+tap_text "Settings"
+sleep 3
+crashed && report_and_fail "opening settings"
+expect_text "Knowledge base"
+tap_text "Knowledge base"
+sleep 3
+crashed && report_and_fail "opening the knowledge base sheet"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+adb shell input keyevent KEYCODE_BACK
+sleep 3
+crashed && report_and_fail "going back to the chat"
 
 adb exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
 if ! adb shell pidof "$PKG" > /dev/null; then
   echo "::error title=Smoke test::App process is not running at the end"
   exit 1
 fi
-echo "::notice title=Smoke test::Launch, terms, home and assistant screen work without crashing"
+echo "::notice title=Smoke test::Terms, chat, model manager, drawer, folder dialog, settings and knowledge sheet work without crashing"

@@ -340,8 +340,9 @@ fun GlobalModelManager(
                 onModelClicked = handleClickModel,
                 onBenchmarkClicked = onBenchmarkClicked,
                 expanded = expanded,
-                isBenchmarkSupported = model.supportModelBenchmark,
-                showBenchmarkActionButton = true,
+                // Piggselle: no benchmark screen.
+                isBenchmarkSupported = false,
+                showBenchmarkActionButton = false,
                 onExpanded = { modelItemExpandedStates[model.name] = it },
                 tosViewModel = tosViewModel,
               )
@@ -369,8 +370,9 @@ fun GlobalModelManager(
                 onModelClicked = handleClickModel,
                 onBenchmarkClicked = onBenchmarkClicked,
                 expanded = true,
-                isBenchmarkSupported = model.supportModelBenchmark,
-                showBenchmarkActionButton = true,
+                // Piggselle: no benchmark screen.
+                isBenchmarkSupported = false,
+                showBenchmarkActionButton = false,
                 tosViewModel = tosViewModel,
               )
             }

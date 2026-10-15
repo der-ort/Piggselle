@@ -100,7 +100,7 @@ object NetworkGate {
     mapOf(
       NetPurpose.WEB_SEARCH to false,
       NetPurpose.MODEL_DOWNLOAD to true,
-      NetPurpose.MODEL_CATALOG to false,
+      NetPurpose.MODEL_CATALOG to true,
       NetPurpose.UNCLASSIFIED to false,
     )
 

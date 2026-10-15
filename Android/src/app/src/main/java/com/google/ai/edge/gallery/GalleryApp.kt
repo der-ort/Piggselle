@@ -20,7 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
-import com.google.ai.edge.gallery.ui.navigation.GalleryNavHost
+import com.google.ai.edge.gallery.assistant.ui.PiggselleNavHost
 
 /** Top level composable representing the main screen of the application. */
 @Composable
@@ -28,5 +28,5 @@ fun GalleryApp(
   navController: NavHostController = rememberNavController(),
   modelManagerViewModel: ModelManagerViewModel,
 ) {
-  GalleryNavHost(navController = navController, modelManagerViewModel = modelManagerViewModel)
+  PiggselleNavHost(navController = navController, modelManagerViewModel = modelManagerViewModel)
 }
