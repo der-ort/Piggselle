@@ -6,15 +6,21 @@ APK="$1"
 PKG="io.github.derort.piggselle"
 OUT="${RUNNER_TEMP:-/tmp}/smoke"
 mkdir -p "$OUT"
+echo "::notice title=Smoke test::started"
+LAST_STEP="setup"
+trap 'code=$?; if [ $code -ne 0 ]; then echo "::error title=Smoke script::exited with code $code during: $LAST_STEP"; fi' EXIT
 
+LAST_STEP="waiting for device"
 adb wait-for-device
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
+LAST_STEP="install"
 adb install -r -g "$APK" || { echo "::error title=Smoke test::APK install failed"; exit 1; }
 adb logcat -c
 
 tap_text() {
+  LAST_STEP="tap $1"
   # tap_text "Accept & continue": find a node whose text matches and tap its center.
   local label="$1"
   for _ in $(seq 1 15); do
@@ -83,6 +89,7 @@ has_text() {
 }
 
 expect_text() {
+  LAST_STEP="expect $1"
   for _ in $(seq 1 10); do has_text "$1" && return 0; sleep 2; done
   echo "::error title=Smoke test::Expected to see '$1' on screen"
   dump_screen
