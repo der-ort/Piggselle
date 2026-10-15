@@ -2,8 +2,15 @@
 
 A private, offline-first AI assistant for Android, tuned for the **Pixel 9 Pro** and built for
 **GrapheneOS**. It is a fork of [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery)
-(Apache 2.0) that turns the agent chat into a personal assistant with:
+(Apache 2.0), stripped down to a simple chat app:
 
+- **Chat-first**: opens straight into a chat. A drawer holds your chats, **folders** and search;
+  **private chats** are never saved and don't use memory.
+- **System prompts** at three levels: persona (default), folder, and per chat.
+- **Knowledge base**: point it at a notes folder (Markor, Obsidian, Markdown, text, CSV, JSON,
+  HTML). Relevant passages are added to your messages, with the source files shown. Keyword
+  search works immediately; optional **EmbeddingGemma 2** adds semantic search, all on-device.
+- **Any LiteRT model from Hugging Face**: search Hugging Face or paste a repo URL in *Models*.
 - **Persona**: editable instructions, a name for you, several personas to switch between.
 - **Memory**: the model *proposes* lasting facts about you; nothing is saved until you approve,
   edit or drop it. Memories are AES-GCM encrypted with an Android Keystore key.
@@ -18,10 +25,12 @@ Once a model is downloaded, the app works fully offline.
 
 | What | Where it goes |
 | --- | --- |
-| Chats, memories, personas, network log | Encrypted on the phone. Excluded from cloud backup and device transfer. |
+| Chats, folders, memories, personas, notes index, network log | Encrypted on the phone. Excluded from cloud backup and device transfer. |
+| Private chats | Only in memory; gone when you leave them. |
+| Your notes folder | Read-only access you grant via the system picker. Never uploaded. |
 | Web search query | Only the (scrubbed, approved) query text, to the SearXNG URL you set. No cookies, neutral User-Agent. |
 | Search results | Shown to the model as untrusted text. Pages are never fetched. |
-| Model downloads | Model files from Hugging Face (`huggingface.co`, `*.hf.co`). Toggleable. |
+| Model downloads & catalog search | Hugging Face only (`huggingface.co`, `*.hf.co`). Both toggleable. |
 | Telemetry | None. Firebase, Google Analytics, FCM, ML Kit/AICore, MediaPipe and the MCP client were removed. CI fails the build if telemetry packages reappear. |
 
 How it's enforced:
@@ -59,11 +68,13 @@ the `.sha256` file.
 
 ## First run
 
-1. Open **Piggselle** on the home screen, pick **Gemma-4-E4B-it**, download it (≈3.7 GB) and keep
-   the accelerator on **GPU**.
-2. Tap the persona chip to set what it should call you, and edit the instructions if you like.
-3. Optional: tap **Local → Privacy & network** to set your SearXNG URL and switch on web search.
-4. Optional: add *Never send these words* (your name, street, employer…).
+1. Accept the notice, then tap **Get Gemma-4-E4B-it** (≈3.7 GB) or **Browse models** to pick
+   another LiteRT model from Hugging Face. Downloads continue in the background.
+2. Chat. The model loads on the GPU the first time (a few seconds).
+3. Optional, in **Settings**: set your name and default system prompt (*Persona*), choose a
+   notes folder (*Knowledge base*), set up SearXNG (*Privacy & web search*).
+4. Use the ☰ drawer for folders (each with its own system prompt and notes setting), search,
+   and private chats. The ⋮ menu edits this chat's system prompt and toggles note search.
 
 ### SearXNG requirements
 
@@ -114,13 +125,17 @@ Local build: `cd Android/src && ./gradlew :app:assembleRelease` (JDK 21, Android
 
 New code lives in `Android/src/app/src/main/java/com/google/ai/edge/gallery/assistant/`:
 
+- `chat/ChatEngine.kt`, `chat/ChatStore.kt`: sessions, streaming, encrypted chats and folders
+- `knowledge/`: notes folder indexing, BM25 search, EmbeddingGemma embeddings
+- `ui/PiggselleNavHost.kt`, `ui/chat/`, `ui/settings/`: the app's screens
+
 - `net/NetworkGate.kt`, `net/HostPolicy.kt`: network policy, fence and log
 - `privacy/QueryScrubber.kt`, `privacy/MarkdownSanitizer.kt`
 - `search/SearxngClient.kt`, `search/SearchResults.kt`
 - `tools/AssistantTools.kt`: `web_search` and `suggest_memory` tools for the model
 - `data/`, `storage/SecureStore.kt`: personas, memories, settings (encrypted)
-- `ui/`: assistant screen, persona/memory/privacy sheets, search confirmation
-- `customtasks/agentchat/AssistantTaskModule.kt`: wires it into the app
+- `ui/`: persona/memory/privacy sheets, search confirmation
+- `customtasks/agentchat/AssistantTaskModule.kt`: model init/cleanup for the assistant
 
 ## License
 
