@@ -138,7 +138,7 @@ object LlmChatModelHelper : LlmModelHelper {
     val shouldEnableAudio = supportAudio
     val preferredBackend =
       when (model.currentAccelerator ?: Accelerator.GPU) {
-        Accelerator.CPU -> Backend.CPU()
+        Accelerator.CPU -> Backend.CPU(threadCount = piggselleCpuThreads())
         Accelerator.GPU -> Backend.GPU()
         Accelerator.NPU -> Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
         Accelerator.TPU -> Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
@@ -196,9 +196,22 @@ object LlmChatModelHelper : LlmModelHelper {
       ExperimentalFlags.enableBenchmark = enableBenchmark
       ExperimentalFlags.enableSpeculativeDecoding = speculativeDecoding
       Log.d(TAG, "Speculative decoding enabled: $speculativeDecoding")
-      val engine = Engine(engineConfig)
+      var engine = Engine(engineConfig)
       try {
-        engine.initialize()
+        try {
+          engine.initialize()
+        } catch (e: Exception) {
+          // Piggselle: if the GPU delegate fails (driver update, low memory, thermal), fall back to
+          // the CPU instead of leaving the user without an assistant.
+          if (preferredBackend !is Backend.GPU) throw e
+          Log.w(TAG, "GPU init failed, falling back to CPU: ${e.message}")
+          try {
+            engine.close()
+          } catch (_: Exception) {}
+          engine =
+            Engine(engineConfig.copy(backend = Backend.CPU(threadCount = piggselleCpuThreads())))
+          engine.initialize()
+        }
       } finally {
         ExperimentalFlags.enableSpeculativeDecoding = false
         ExperimentalFlags.enableBenchmark = false
@@ -573,3 +586,10 @@ object LlmChatModelHelper : LlmModelHelper {
     return stream.toByteArray()
   }
 }
+
+/**
+ * Piggselle: CPU threads for LiteRT-LM. The Pixel 9 Pro's Tensor G4 has 1 prime + 3 performance +
+ * 4 efficiency cores; using only the fast cores is quicker than spreading decode across all eight.
+ */
+internal fun piggselleCpuThreads(): Int =
+  (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
