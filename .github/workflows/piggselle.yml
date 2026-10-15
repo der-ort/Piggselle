@@ -48,14 +48,25 @@ jobs:
           fi
 
       - name: Unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:testDebugUnitTest 2>&1 | tee "$RUNNER_TEMP/test.log" || {
+            # Surface compiler errors and failed tests as annotations (job logs are long).
+            grep -E "^e: |FAILED|AssertionError|What went wrong" -A2 "$RUNNER_TEMP/test.log" | head -60 | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          }
 
       - name: Build release APK
         env:
           PIGGSELLE_KEYSTORE_PASSWORD: ${{ secrets.PIGGSELLE_KEYSTORE_PASSWORD }}
           PIGGSELLE_KEY_ALIAS: ${{ secrets.PIGGSELLE_KEY_ALIAS }}
           PIGGSELLE_KEY_PASSWORD: ${{ secrets.PIGGSELLE_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon :app:assembleRelease
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:assembleRelease 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E "^e: |What went wrong|ERROR:" -A3 "$RUNNER_TEMP/build.log" | head -60 | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          }
 
       - name: Collect APK
         id: apk
