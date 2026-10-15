@@ -33,7 +33,7 @@
   <string name="aichat_initializing_title" translatable="true" description="Status indicator when initializing model. [CHAR_LIMIT=31]">Initializing model</string>
   <string name="aichat_initializing_content" translatable="true" description="Loading message shown while a chat or translator session is initializing. [CHAR_LIMIT=110]">Sit tight, this can take up to 1 minute</string>
   <string name="app_intro" translatable="true" description="Introduction text shown on the home screen. [CHAR_LIMIT=90]">Explore a world of amazing on-device models from</string>
-  <string name="app_name" translatable="false">Google AI Edge Gallery</string>
+  <string name="app_name" translatable="false">Piggselle</string>
   <string name="app_name_first_part" translatable="false">Google AI</string>
   <string name="app_name_second_part" translatable="false">Edge Gallery</string>
   <string name="askimage_emptystate_title" translatable="false">Ask Image</string>
@@ -426,7 +426,7 @@
   <string name="select_script" translatable="true" description="Label for a dropdown menu to select which script to view or edit. [CHAR_LIMIT=22]">Select script</string>
   <string name="script_name" translatable="true" description="Label for the text input field where the user enters the name of a new script. [CHAR_LIMIT=19]">Script name</string>
   <string name="script_content" translatable="true" description="Label or header for the content/code of a script. [CHAR_LIMIT=30]">Script content</string>
-  <string name="skills" translatable="true" description="Label for the button that opens the skill management options. [CHAR_LIMIT=18]">Skills</string>
+  <string name="skills" translatable="true" description="Label for the button that opens the skill management options. [CHAR_LIMIT=18]">Persona</string>
   <plurals name="skills_count" translatable="true">
     <item quantity="one">%d skill</item>
     <item quantity="other">%d skills</item>
@@ -437,7 +437,7 @@
   <string name="use_call_js_template" translatable="true" description="Button label to pre-fill the instructions field with a template for calling JavaScript code. [CHAR_LIMIT=30]">Use Call JS template</string>
 
   <!-- Strings for MCP -->
-  <string name="mcp" translatable="true" description="Label for the button that opens the Model Context Protocol (MCP) manager. [CHAR_LIMIT=18]">MCP</string>
+  <string name="mcp" translatable="true" description="Label for the button that opens the Model Context Protocol (MCP) manager. [CHAR_LIMIT=18]">Memory</string>
   <string name="mcp_tool_call_permission_title" translatable="true" description="Title of the dialog asking the user for permission to execute an MCP tool. [CHAR_LIMIT=45]">Permission to call MCP tool?</string>
   <string name="mcp_tool_name_label" translatable="true" description="Label prefixing the name of the tool requesting execution permission. [CHAR_LIMIT=18]">Tool name</string>
   <string name="mcp_tool_input_label" translatable="true" description="Label prefixing the input arguments being passed to the tool. [CHAR_LIMIT=18]">Input</string>
@@ -907,7 +907,7 @@
   <string name="task_label_ask_image" translatable="false">Ask Image</string>
   <string name="task_label_audio_scribe" translatable="false">Audio Scribe</string>
   <string name="task_label_tiny_garden" translatable="false">Tiny Garden</string>
-  <string name="task_label_agent_skills" translatable="false">Agent Skills</string>
+  <string name="task_label_agent_skills" translatable="false">Piggselle</string>
   <!-- Description for the AI Chat task. [CHAR_LIMIT=100] -->
   <string name="task_desc_ai_chat" translatable="true" description="Description for the AI Chat task. [CHAR_LIMIT=90]">Chat with on-device large language models</string>
   <!-- Short description for the AI Chat task. [CHAR_LIMIT=35] -->
@@ -1196,9 +1196,9 @@
   <!-- Get started button label in onboarding. [CHAR_LIMIT=20] -->
   <string name="smartalbum_onboarding_get_started" translatable="true" description="Get started button label in onboarding. [CHAR_LIMIT=20]">Get started</string>
   <!-- Description for the Agent Skills task. [CHAR_LIMIT=100] -->
-  <string name="task_desc_agent_skills" translatable="true" description="Description for the Agent Skills task. [CHAR_LIMIT=106]">Chat with on-device large language models with skills and tools</string>
+  <string name="task_desc_agent_skills" translatable="true" description="Description for the Agent Skills task. [CHAR_LIMIT=106]">Your private on-device assistant with persona, memory and filtered web search</string>
   <!-- Short description for the Agent Skills task. [CHAR_LIMIT=35] -->
-  <string name="task_short_desc_agent_skills" translatable="true" description="Short description for the Agent Skills task. [CHAR_LIMIT=45]">Complete agentic tasks with chat</string>
+  <string name="task_short_desc_agent_skills" translatable="true" description="Short description for the Agent Skills task. [CHAR_LIMIT=45]">Private assistant: day, tasks, health log</string>
 
   <!-- Label for the link to example code. [CHAR_LIMIT=20] -->
   <string name="example_code" translatable="true" description="Label for the link to example code. [CHAR_LIMIT=21]">Example code</string>

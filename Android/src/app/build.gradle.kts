@@ -31,11 +31,12 @@ android {
   compileSdk { this.version = release(37) { minorApiLevel = 0 } }
 
   defaultConfig {
-    applicationId = "com.google.aiedge.gallery"
+    // Piggselle: own application id so it installs next to upstream Edge Gallery.
+    applicationId = "io.github.derort.piggselle"
     minSdk = 31
     targetSdk = 37
-    versionCode = 46
-    versionName = "1.0.20"
+    versionCode = 1
+    versionName = "0.1.0"
 
     // Needed for HuggingFace auth workflows.
     // Use the scheme of the "Redirect URLs" in HuggingFace app.
@@ -49,13 +50,33 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  // Release signing comes from CI secrets (see .github/workflows/piggselle.yml). Without them the
+  // build falls back to the debug key so it still produces an installable APK.
+  val releaseKeystore = System.getenv("PIGGSELLE_KEYSTORE")
+  signingConfigs {
+    if (releaseKeystore != null && file(releaseKeystore).exists()) {
+      create("piggselle") {
+        storeFile = file(releaseKeystore)
+        storePassword = System.getenv("PIGGSELLE_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("PIGGSELLE_KEY_ALIAS")
+        keyPassword = System.getenv("PIGGSELLE_KEY_PASSWORD")
+        enableV2Signing = true
+        enableV3Signing = true
+      }
+    }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig =
+        signingConfigs.findByName("piggselle") ?: signingConfigs.getByName("debug")
     }
   }
+
+  // Pixel 9 Pro is arm64-v8a only; dropping other ABIs keeps the APK smaller.
+  defaultConfig { ndk { abiFilters += listOf("arm64-v8a") } }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11

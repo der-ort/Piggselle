@@ -169,6 +169,7 @@ fun MessageInputText(
   audioClipMessageCount: Int,
   skillCount: Int = 0,
   mcpCount: Int = 0,
+  extraInputChips: @Composable () -> Unit = {},
   modelInitializing: Boolean,
   @StringRes textFieldPlaceHolderRes: Int,
   onValueChanged: (String) -> Unit,
@@ -435,6 +436,10 @@ fun MessageInputText(
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
                 Row(
+                  // Piggselle: scroll instead of overflowing when extra chips are present.
+                  modifier =
+                    Modifier.weight(1f, fill = false)
+                      .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                   verticalAlignment = Alignment.CenterVertically,
                   horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
@@ -735,6 +740,9 @@ fun MessageInputText(
                       }
                     }
                   }
+
+                  // Piggselle: task-provided chips (persona, memory, web search).
+                  extraInputChips()
 
                   // Live metrics toggle.
                   if (showLiveMetricsToggle) {

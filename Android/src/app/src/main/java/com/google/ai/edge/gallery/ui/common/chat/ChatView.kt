@@ -120,6 +120,7 @@ fun ChatView(
   modifier: Modifier = Modifier,
   skillCount: Int = 0,
   mcpCount: Int = 0,
+  extraInputChips: @Composable () -> Unit = {},
   /** Callback triggered when a saved chat session is selected from history to be restored. */
   onRestoreSessionClicked: (ChatSessionProto) -> Unit = {},
   /** Callback triggered when the user requests to start a new chat session. */
@@ -377,6 +378,7 @@ fun ChatView(
                       innerPadding = innerPadding,
                       skillCount = skillCount,
                       mcpCount = mcpCount,
+                      extraInputChips = extraInputChips,
                       navigateUp = navigateUp,
                       onSendMessage = { model, messages -> onSendMessage(model, messages) },
                       onRunAgainClicked = onRunAgainClicked,

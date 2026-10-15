@@ -92,6 +92,7 @@ fun LlmChatScreen(
   getActiveSkills: () -> List<String> = { emptyList() },
   skillCount: Int = 0,
   mcpCount: Int = 0,
+  extraInputChips: @Composable () -> Unit = {},
   mcpToolsCount: Int = 0,
 ) {
   ChatViewWrapper(
@@ -110,6 +111,7 @@ fun LlmChatScreen(
     curSystemPrompt = curSystemPrompt,
     skillCount = skillCount,
     mcpCount = mcpCount,
+    extraInputChips = extraInputChips,
     mcpToolsCount = mcpToolsCount,
     onSystemPromptChanged = onSystemPromptChanged,
     emptyStateComposable = emptyStateComposable,
@@ -245,6 +247,7 @@ fun ChatViewWrapper(
   getActiveSkills: () -> List<String> = { emptyList() },
   skillCount: Int = 0,
   mcpCount: Int = 0,
+  extraInputChips: @Composable () -> Unit = {},
   mcpToolsCount: Int = 0,
 ) {
   val context = LocalContext.current
@@ -399,6 +402,7 @@ fun ChatViewWrapper(
     navigateUp = navigateUp,
     skillCount = skillCount,
     mcpCount = mcpCount,
+    extraInputChips = extraInputChips,
     modifier = modifier,
     composableBelowMessageList = composableBelowMessageList,
     showImagePicker = showImagePicker,

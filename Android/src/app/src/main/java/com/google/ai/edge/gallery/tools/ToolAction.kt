@@ -26,6 +26,8 @@ enum class ToolActionName() {
   ASK_INFO,
   REQUEST_PERMISSION,
   ASK_MCP_TOOL_CALL_PERMISSION,
+  /** Piggselle: ask the user to approve (or edit) a scrubbed web search query. */
+  CONFIRM_WEB_SEARCH,
 }
 
 /**

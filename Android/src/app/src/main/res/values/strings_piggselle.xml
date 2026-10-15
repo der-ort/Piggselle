@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Piggselle-specific strings. Copyright 2026 Daniel (der-ort), Apache-2.0. -->
+<resources>
+    <string name="assistant_app_name" translatable="false">Piggselle</string>
+</resources>
