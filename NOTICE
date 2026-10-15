@@ -1,0 +1,11 @@
+Piggselle
+Copyright 2026 Daniel (der-ort)
+
+This product is a fork of Google AI Edge Gallery
+(https://github.com/google-ai-edge/gallery), Copyright 2025 Google LLC,
+licensed under the Apache License, Version 2.0.
+
+Files modified from the original carry a "Modifications copyright" notice.
+Files under com/google/ai/edge/gallery/assistant/ are new in this fork.
+"Google", "Gemma" and "LiteRT" are trademarks of Google LLC; this project is
+not affiliated with or endorsed by Google.

@@ -136,3 +136,4 @@ jobs:
             ${{ steps.apk.outputs.path }}
             ${{ steps.apk.outputs.path }}.sha256
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

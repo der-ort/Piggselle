@@ -1,91 +1,124 @@
-# Google AI Edge Gallery ✨
+# 🐷 Piggselle
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/google-ai-edge/gallery)](https://github.com/google-ai-edge/gallery/releases)
+A private, offline-first AI assistant for Android, tuned for the **Pixel 9 Pro** and built for
+**GrapheneOS**. It is a fork of [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery)
+(Apache 2.0) that turns the agent chat into a personal assistant with:
 
-**Explore, Experience, and Evaluate the Future of On-Device Generative AI with Google AI Edge.**
+- **Persona**: editable instructions, a name for you, several personas to switch between.
+- **Memory**: the model *proposes* lasting facts about you; nothing is saved until you approve,
+  edit or drop it. Memories are AES-GCM encrypted with an Android Keystore key.
+- **Filtered web search** through **your own SearXNG**: queries are scrubbed of personal data and
+  shown to you before they leave the phone (auto mode optional; health topics always ask).
+- **On-device inference** with LiteRT-LM on the Tensor G4 GPU (Gemma 4 E4B recommended), with
+  automatic CPU fallback.
 
-AI Edge Gallery is the premier destination for running the world's most powerful open-source Large Language Models (LLMs) on your mobile device. Experience high-performance Generative AI directly on your hardware—fully offline, private, and lightning-fast.
+Once a model is downloaded, the app works fully offline.
 
-**Now Featuring: [EmbeddingGemma 2](https://developers.googleblog.com/google-ai-edge-with-embeddinggemma-2/)**
+## Privacy model
 
-The latest version brings official support for the newly released EmbeddingGemma 2 model. With this release, we bring cutting edge, multimodal semantic search running 100% on your device. Try out these new capabilities in our new features Instant Media Search and Video Moment Finder.
+| What | Where it goes |
+| --- | --- |
+| Chats, memories, personas, network log | Encrypted on the phone. Excluded from cloud backup and device transfer. |
+| Web search query | Only the (scrubbed, approved) query text, to the SearXNG URL you set. No cookies, neutral User-Agent. |
+| Search results | Shown to the model as untrusted text. Pages are never fetched. |
+| Model downloads | Model files from Hugging Face (`huggingface.co`, `*.hf.co`). Toggleable. |
+| Telemetry | None. Firebase, Google Analytics, FCM, ML Kit/AICore, MediaPipe and the MCP client were removed. CI fails the build if telemetry packages reappear. |
 
+How it's enforced:
 
-| **Install the app today from Google Play** | **Install the app today from App Store** | **Download for macOS** |
-| :--- | :--- | :--- |
-| <a href='https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery'><img alt='Get it on Google Play' height="120" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a> | <a href="https://apps.apple.com/us/app/google-ai-edge-gallery/id6749645337?itscg=30200&itsct=apps_box_badge&mttnsubad=6749645337" style="display: inline-block;"> <img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1771977600" alt="Download on the App Store" style="width: 244px; height: 88px; vertical-align: middle; object-fit: contain;" /></a> | <a href="https://dl.google.com/google-ai-edge-gallery/macos/dmg/GoogleAIEdgeGallery-0.1.0.dmg"><img alt='Download for macOS' width="257" height="97" src="https://github.com/user-attachments/assets/29c70795-93b3-4e8b-8752-0cad4e413182" /></a> |
+1. **NetworkGate**: every request in the app goes through one class that checks a purpose
+   (web search, model download, catalog), the offline switch, and a host allowlist. Each redirect
+   hop is checked again, and tokens are never forwarded to another host. Every attempt, allowed or
+   blocked, lands in an encrypted log you can view under *Privacy*.
+2. **Process fence**: a default `ProxySelector` sends any HTTP(S) connection that no enabled
+   purpose allows to a dead local proxy. That covers code that doesn't go through the gate (for
+   example library uploaders).
+3. **QueryScrubber**: removes your private terms (names, places…), emails, phone numbers, IBANs,
+   card numbers, IPs, coordinates, dates, street addresses, postcodes, long numbers and
+   first-person wording ("my", "ich", …). It flags health terms (German and English) so you
+   always see those queries.
+4. **Rendering**: markdown images become plain links, so model output can't trigger hidden
+   requests.
+5. **GrapheneOS**: for belt and braces, revoke Piggselle's *Network* permission whenever you
+   don't need search or downloads.
 
-For users without Google Play access, install the apk from the [**latest release**](https://github.com/google-ai-edge/gallery/releases/latest/)
+The scrubber is a pattern-based safety net, not a guarantee. That's why confirmation is the
+default.
 
+## Install
 
-## App Preview
+**Obtainium** (recommended): add `https://github.com/der-ort/Piggselle`. Releases are built and
+signed by GitHub Actions.
 
-<img width="480" alt="01" src="https://github.com/user-attachments/assets/d6edaadf-42be-4c87-a902-3fc96b09efde" />
-<img width="480" alt="02" src="https://github.com/user-attachments/assets/e597ae4c-8d32-4428-a267-8ac8f7e41a61" />
-<img width="480" alt="03" src="https://github.com/user-attachments/assets/c05ccc3b-628e-47d1-a635-8516fced08fa" />
-<img width="480" alt="04" src="https://github.com/user-attachments/assets/fc86b3f8-1eae-4199-be36-43b9f51c4f0b" />
-<img width="480" alt="05" src="https://github.com/user-attachments/assets/a22b5e2c-c456-483e-bf52-fe30d64d64e9" />
-<img width="480" alt="06" src="https://github.com/user-attachments/assets/4d0cf0ca-6806-40e2-990e-dc7d02d31b4e" />
-<img width="480" alt="07" src="https://github.com/user-attachments/assets/3390ddc1-7e38-4f03-9df3-aa9d1fe05df0" />
-<img width="480" alt="08" src="https://github.com/user-attachments/assets/222b66fd-6d39-4680-ab2c-cd695ceaeba4" />
+Or download the APK from [Releases](https://github.com/der-ort/Piggselle/releases) and check
+the `.sha256` file.
 
-## ✨ Core Features
+## First run
 
-* **Agent Skills**: Transform your LLM from a conversationalist into a proactive assistant. Use the Agent Skills tile to augment model capabilities with tools like Wikipedia for fact-grounding, interactive maps, and rich visual summary cards. You can even load modular skills from a URL or browse community contributions on GitHub Discussions.
+1. Open **Piggselle** on the home screen, pick **Gemma-4-E4B-it**, download it (≈3.7 GB) and keep
+   the accelerator on **GPU**.
+2. Tap the persona chip to set what it should call you, and edit the instructions if you like.
+3. Optional: tap **Local → Privacy & network** to set your SearXNG URL and switch on web search.
+4. Optional: add *Never send these words* (your name, street, employer…).
 
-* **AI Chat with Thinking Mode**: Engage in fluid, multi-turn conversations and toggle the new Thinking Mode to peek "under the hood." This feature allows you to see the model’s step-by-step reasoning process, which is perfect for understanding complex problem-solving. Note: Thinking Mode currently works with supported models, starting with the Gemma 4 family.
+### SearXNG requirements
 
-* **Instant Media Search**: Explore your photo library (or built-in sample media) with fast, search-as-you-type natural language queries and image-to-image similarity matching—with zero cloud roundtrips.
+The instance must allow JSON output. In `settings.yml`:
 
-* **Video Moment Finder**: Pinpoint exact moments inside videos using natural language descriptions. Jump straight to highlighted timestamps on an interactive timeline, trim clips, and save or export your favorite moments
+```yaml
+search:
+  formats:
+    - html
+    - json
+```
 
-* **Ask Image**: Use multimodal power to identify objects, solve visual puzzles, or get detailed descriptions using your device’s camera or photo gallery.
+`https://` works for any host. Plain `http://` is accepted only for LAN or Tailscale addresses
+(`10.x`, `192.168.x`, `100.64.0.0/10`, `*.ts.net`, …). If your instance runs the limiter, allow
+your tailnet IP or disable the limiter for it. Use **Test with "weather"** in the app to check.
 
-* **Audio Scribe**: Transcribe and translate voice recordings into text in real-time using high-efficiency on-device language models.
+## Building
 
-* **Prompt Lab**: A dedicated workspace to test different prompts and single-turn use cases with granular control over model parameters like temperature and top-k.
+GitHub Actions builds every push (`.github/workflows/piggselle.yml`): unit tests, release APK,
+privacy checks on the APK (permissions, no telemetry classes), and a GitHub Release for `v*` tags.
 
-* **Mobile Actions**: Unlock offline device controls and automated tasks powered entirely by a finetune of FunctionGemma 270m.
+### Release signing (needed for updates)
 
-* **Tiny Garden**: A fun, experimental mini-game that uses natural language to plant and harvest a virtual garden using a finetune of FunctionGemma 270m.
+Android only installs an update if it's signed with the same key. Create a key once, on your
+own machine:
 
-* **Model Management & Benchmark**: Gallery is a flexible sandbox for a wide variety of open-source models. Easily download models from the list or load your own custom models. Manage your model library effortlessly and run benchmark tests to understand exactly how each model performs on your specific hardware.
+```sh
+keytool -genkeypair -v -keystore piggselle.jks -alias piggselle \
+  -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=Piggselle"
+base64 -w0 piggselle.jks > piggselle.jks.b64
+```
 
-* **100% On-Device Privacy**: All model inferences happen directly on your device hardware. No internet is required, ensuring total privacy for your prompts, images, and sensitive data.
+Add these repository secrets (*Settings → Secrets and variables → Actions*):
 
-## 🏁 Get Started in Minutes!
+| Secret | Value |
+| --- | --- |
+| `PIGGSELLE_KEYSTORE_BASE64` | contents of `piggselle.jks.b64` |
+| `PIGGSELLE_KEYSTORE_PASSWORD` | keystore password |
+| `PIGGSELLE_KEY_ALIAS` | `piggselle` |
+| `PIGGSELLE_KEY_PASSWORD` | key password (same as keystore password unless you chose another) |
 
-1. **Check OS Requirement**: Android 12 and up, and iOS 17 and up.
-2.  **Download the App:**
-    - Install the app from [Google Play](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery) or [App Store](https://apps.apple.com/us/app/google-ai-edge-gallery/id6749645337).
-    - For users without Google Play access: install the apk from the [**latest release**](https://github.com/google-ai-edge/gallery/releases/latest/)
-3.  **Install & Explore:** For detailed installation instructions (including for corporate devices) and a full user guide, head over to our [**Project Wiki**](https://github.com/google-ai-edge/gallery/wiki)!
+Back up `piggselle.jks` and its password somewhere safe. Without the secrets, CI signs with a
+throwaway debug key: fine for testing, but every build then needs a reinstall.
 
-## 🛠️ Technology Highlights
+Local build: `cd Android/src && ./gradlew :app:assembleRelease` (JDK 21, Android SDK 37).
 
-*   **Google AI Edge:** Core APIs and tools for on-device ML.
-*   **LiteRT:** Lightweight runtime for optimized model execution.
-*   **Hugging Face Integration:** For model discovery and download.
+## Code map
 
-## ⌨️ Development
+New code lives in `Android/src/app/src/main/java/com/google/ai/edge/gallery/assistant/`:
 
-Check out the [development notes](DEVELOPMENT.md) for instructions about how to build the app locally.
+- `net/NetworkGate.kt`, `net/HostPolicy.kt`: network policy, fence and log
+- `privacy/QueryScrubber.kt`, `privacy/MarkdownSanitizer.kt`
+- `search/SearxngClient.kt`, `search/SearchResults.kt`
+- `tools/AssistantTools.kt`: `web_search` and `suggest_memory` tools for the model
+- `data/`, `storage/SecureStore.kt`: personas, memories, settings (encrypted)
+- `ui/`: assistant screen, persona/memory/privacy sheets, search confirmation
+- `customtasks/agentchat/AssistantTaskModule.kt`: wires it into the app
 
-## 🤝 Feedback
+## License
 
-This is an **experimental Beta release**, and your input is crucial!
-
-*   🐞 **Found a bug?** [Report it here!](https://github.com/google-ai-edge/gallery/issues/new?assignees=&labels=bug&template=bug_report.md&title=%5BBUG%5D)
-*   💡 **Have an idea?** [Suggest a feature!](https://github.com/google-ai-edge/gallery/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=%5BFEATURE%5D)
-
-## 📄 License
-
-Licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
-
-## 🔗 Useful Links
-
-*   [**Project Wiki (Detailed Guides)**](https://github.com/google-ai-edge/gallery/wiki)
-*   [Hugging Face LiteRT Community](https://huggingface.co/litert-community)
-*   [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)
-*   [Google AI Edge Documentation](https://ai.google.dev/edge)
+Apache 2.0, like upstream. See `LICENSE` and `NOTICE`. Not affiliated with Google.
+The original README is kept as `UPSTREAM_README.md`.

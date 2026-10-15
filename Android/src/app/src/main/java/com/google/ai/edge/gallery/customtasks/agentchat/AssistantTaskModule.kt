@@ -89,11 +89,6 @@ class AssistantTask(
     )
   }
 
-  // Keep the model loaded when briefly leaving the assistant (e.g. into settings): reloading a
-  // 3.6 GB model on every navigation is slow and hard on the battery.
-  override val keepModelAlive: Boolean
-    get() = true
-
   override fun initializeModelFn(
     context: Context,
     coroutineScope: CoroutineScope,
