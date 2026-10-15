@@ -90,9 +90,14 @@ jobs:
             if grep -rqa "L$pat/" "$RUNNER_TEMP/dex"; then BAD="$BAD $pat"; fi
           done
           if [ -n "$BAD" ]; then
-            DETAIL=$(grep -rhoa 'Lcom/google/firebase/[a-z]*/' "$RUNNER_TEMP/dex" | sort -u | tr '\n' ' ')
+            DETAIL=$(grep -rhoaE 'L(com/google/firebase|com/google/android/gms/measurement|io/ktor|io/modelcontextprotocol)/[A-Za-z0-9_/$]{0,80}' "$RUNNER_TEMP/dex" | sort -u | head -40 | tr '\n' ' ')
             echo "::error title=Telemetry found::$BAD | $DETAIL"
-            cd "$GITHUB_WORKSPACE/Android/src" && ./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath | grep -B3 -i firebase | head -40 | tr '\n' '~' | sed 's/~/ ⏎ /g' | xargs -0 -I{} echo "::error title=Firebase dependency path::{}"
+            cd "$GITHUB_WORKSPACE/Android/src"
+            ./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath > "$RUNNER_TEMP/deps.txt" 2>&1 || true
+            grep -n -i "firebase\|datatransport" "$RUNNER_TEMP/deps.txt" | head -30 | while IFS= read -r l; do echo "::error title=dep::$l"; done
+            for n in $(grep -n -i "firebase" "$RUNNER_TEMP/deps.txt" | head -3 | cut -d: -f1); do
+              awk -v n="$n" 'NR<=n && /^[+\\]/ {top=$0} NR==n {print "top-level for line " n ": " top}' "$RUNNER_TEMP/deps.txt" | while IFS= read -r l; do echo "::error title=dep root::$l"; done
+            done
             exit 1
           fi
           echo "::notice title=No telemetry::No Firebase, Measurement, Ktor or MCP classes in the APK"
