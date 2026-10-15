@@ -86,7 +86,9 @@ jobs:
           echo "::notice title=Permissions::$PERMS"
           mkdir -p "$RUNNER_TEMP/dex" && unzip -q -o "$APK" 'classes*.dex' -d "$RUNNER_TEMP/dex"
           BAD=""
-          for pat in com/google/firebase com/google/android/gms/measurement io/ktor io/modelcontextprotocol; do
+          # FirebaseException & co. live in play-services-basement (used by the OSS licenses
+          # screen) and are harmless; these packages are the ones that actually phone home.
+          for pat in com/google/firebase/analytics com/google/firebase/messaging com/google/firebase/installations com/google/firebase/crashlytics com/google/firebase/perf com/google/android/gms/measurement io/ktor io/modelcontextprotocol; do
             if grep -rqa "L$pat/" "$RUNNER_TEMP/dex"; then BAD="$BAD $pat"; fi
           done
           if [ -n "$BAD" ]; then
