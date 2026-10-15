@@ -378,13 +378,18 @@ fun NoModelCard(
         downloadError?.let {
           Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Stacked, so both buttons fit on narrow screens.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
           if (recommended != null) {
-            Button(onClick = { onDownload(recommended) }) {
-              Text("Get ${recommended.displayName.ifEmpty { recommended.name }}")
+            Button(onClick = { onDownload(recommended) }, modifier = Modifier.fillMaxWidth()) {
+              Text(
+                "Get ${recommended.displayName.ifEmpty { recommended.name }}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
             }
           }
-          OutlinedButton(onClick = onBrowse) { Text("Browse models") }
+          OutlinedButton(onClick = onBrowse, modifier = Modifier.fillMaxWidth()) { Text("Browse models") }
         }
       }
     }
