@@ -48,7 +48,11 @@ default.
 ## Install
 
 **Obtainium** (recommended): add `https://github.com/der-ort/Piggselle`. Releases are built and
-signed by GitHub Actions.
+signed by GitHub Actions. Until release signing is set up (see below), builds are published as
+pre-releases, so turn on *Include prereleases* in Obtainium.
+
+To publish an update, bump `versionName` and `versionCode` in `Android/src/app/build.gradle.kts`
+and push to `main`. CI creates the `v<versionName>` release once per version.
 
 Or download the APK from [Releases](https://github.com/der-ort/Piggselle/releases) and check
 the `.sha256` file.
