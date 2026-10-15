@@ -82,6 +82,13 @@ for m in re.finditer(r'<node [^>]*>', xml):
 PY
 }
 
+hide_keyboard() {
+  if adb shell dumpsys input_method | grep -q "mInputShown=true"; then
+    adb shell input keyevent KEYCODE_BACK
+    sleep 1
+  fi
+}
+
 has_text() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
   adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
@@ -123,6 +130,7 @@ sleep 2
 crashed && report_and_fail "opening the new folder dialog"
 tap_text "Cancel"
 sleep 2
+hide_keyboard
 
 # Drawer -> settings -> knowledge base sheet.
 tap_text "Settings"
