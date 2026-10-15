@@ -90,11 +90,15 @@ fun processLlmResponse(response: String): String {
   return response.replace("\\n", "\n")
 }
 
-inline fun <reified T> getJsonResponse(url: String): JsonObjAndTextContent<T>? {
+inline fun <reified T> getJsonResponse(
+  url: String,
+  purpose: com.google.ai.edge.gallery.assistant.net.NetPurpose =
+    com.google.ai.edge.gallery.assistant.net.NetPurpose.UNCLASSIFIED,
+): JsonObjAndTextContent<T>? {
   try {
-    val connection = URL(url).openConnection() as HttpURLConnection
-    connection.requestMethod = "GET"
-    connection.connect()
+    // Piggselle: goes through NetworkGate. UNCLASSIFIED requests are always blocked.
+    val connection =
+      com.google.ai.edge.gallery.assistant.net.NetworkGate.openFollowingRedirects(url, purpose)
 
     val responseCode = connection.responseCode
     if (responseCode == HttpURLConnection.HTTP_OK) {

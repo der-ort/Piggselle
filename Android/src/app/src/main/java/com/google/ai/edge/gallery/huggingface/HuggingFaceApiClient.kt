@@ -16,6 +16,8 @@
 
 package com.google.ai.edge.gallery.huggingface
 
+import com.google.ai.edge.gallery.assistant.net.NetPurpose
+import com.google.ai.edge.gallery.assistant.net.NetworkGate
 import android.util.Log
 import androidx.core.net.toUri
 import com.google.ai.edge.gallery.data.ModelAccessibility
@@ -213,14 +215,18 @@ constructor(@IoDispatcher private val ioDispatcher: CoroutineDispatcher) {
     method: String = "GET",
     accessToken: String? = null,
   ): HttpURLConnection {
-    val url = URL(urlString)
-    val connection = url.openConnection() as HttpURLConnection
-    connection.requestMethod = method
-    connection.setRequestProperty("User-Agent", USER_AGENT)
-    if (!accessToken.isNullOrEmpty()) {
-      connection.setRequestProperty("Authorization", "Bearer $accessToken")
+    // Piggselle: all Hugging Face traffic goes through NetworkGate. Catalog searches (which send
+    // search terms) are a separate, default-off purpose from model downloads.
+    val purpose =
+      if (urlString.contains("/api/models?") || urlString.contains("search="))
+        NetPurpose.MODEL_CATALOG
+      else NetPurpose.MODEL_DOWNLOAD
+    return NetworkGate.openFollowingRedirects(urlString, purpose, method) { conn, sameHostAsFirst ->
+      conn.setRequestProperty("User-Agent", USER_AGENT)
+      if (!accessToken.isNullOrEmpty() && sameHostAsFirst) {
+        conn.setRequestProperty("Authorization", "Bearer $accessToken")
+      }
     }
-    return connection
   }
 
   private fun executeGetRequest(urlString: String, accessToken: String? = null): String? {

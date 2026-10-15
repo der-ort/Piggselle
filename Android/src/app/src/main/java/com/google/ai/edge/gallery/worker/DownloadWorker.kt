@@ -54,8 +54,9 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import com.google.ai.edge.gallery.assistant.net.NetPurpose
+import com.google.ai.edge.gallery.assistant.net.NetworkGate
 import java.net.HttpURLConnection
-import java.net.URL
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
@@ -137,14 +138,6 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
           val bytesReadSizeBuffer: MutableList<Long> = mutableListOf()
           val bytesReadLatencyBuffer: MutableList<Long> = mutableListOf()
           for (file in allFiles) {
-            val url = URL(file.url)
-
-            val connection = url.openConnection() as HttpURLConnection
-            if (accessToken != null) {
-              Log.d(TAG, "Using access token: ${accessToken.subSequence(0, 10)}...")
-              connection.setRequestProperty("Authorization", "Bearer $accessToken")
-            }
-
             // Prepare output file's dir.
             val outputDir =
               if (isModelImported) {
@@ -177,11 +170,22 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
                 TAG,
                 "File '${outputTmpFile.name}' partial size: ${outputFileBytes}. Trying to resume download",
               )
-              connection.setRequestProperty("Range", "bytes=${outputFileBytes}-")
-              // Force the server to send non-compressed data to make download resuming work.
-              connection.setRequestProperty("Accept-Encoding", "identity")
             }
-            connection.connect()
+            // Piggselle: every hop (Hugging Face redirects to its CDN) is checked by NetworkGate.
+            // The access token is only sent to the original host, never to a redirect target.
+            val connection =
+              NetworkGate.openFollowingRedirects(file.url, NetPurpose.MODEL_DOWNLOAD) {
+                conn,
+                sameHostAsFirst ->
+                if (accessToken != null && sameHostAsFirst) {
+                  conn.setRequestProperty("Authorization", "Bearer $accessToken")
+                }
+                if (outputFileBytes > 0) {
+                  conn.setRequestProperty("Range", "bytes=${outputFileBytes}-")
+                  // Force the server to send non-compressed data to make download resuming work.
+                  conn.setRequestProperty("Accept-Encoding", "identity")
+                }
+              }
             Log.d(TAG, "response code: ${connection.responseCode}")
 
             if (

@@ -16,6 +16,8 @@
 
 package com.google.ai.edge.gallery.ui.modelmanager
 
+import com.google.ai.edge.gallery.assistant.net.NetPurpose
+import com.google.ai.edge.gallery.assistant.net.NetworkGate
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -506,10 +508,9 @@ private suspend fun fetchHuggingFaceFileSize(
 
 /** Fetches the file size from a generic, non-Hugging-Face HTTP URL via Range GET. */
 private suspend fun fetchHttpFileSize(urlStr: String): Long {
-  val url = runCatching { URL(urlStr) }.getOrNull() ?: return 0L
+  // Piggselle: only allowed model hosts pass NetworkGate; anything else returns 0.
   val connection =
-    runCatching { url.openConnection() as HttpURLConnection }.getOrNull() ?: return 0L
-  connection.requestMethod = "GET"
+    runCatching { NetworkGate.open(urlStr, NetPurpose.MODEL_DOWNLOAD) }.getOrNull() ?: return 0L
 
   // Request only the first 1 byte (bytes=0-0) to inspect file headers without downloading the
   // entire payload.

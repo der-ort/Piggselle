@@ -16,6 +16,8 @@
 
 package com.google.ai.edge.gallery.ui.modelmanager
 
+import com.google.ai.edge.gallery.assistant.net.NetPurpose
+import com.google.ai.edge.gallery.assistant.net.NetworkGate
 import android.content.Context
 import android.util.Log
 import androidx.activity.result.ActivityResult
@@ -106,6 +108,7 @@ import net.openid.appauth.ResponseTypeValues
 private const val TAG = "AGModelManagerViewModel"
 private const val TEXT_INPUT_HISTORY_MAX_SIZE = 50
 private const val MODEL_ALLOWLIST_FILENAME = "model_allowlist.json"
+private const val BUNDLED_MODEL_ALLOWLIST_ASSET = "model_allowlist.json"
 private const val ALLOWLIST_BASE_URL =
   "https://raw.githubusercontent.com/google-ai-edge/gallery/refs/heads/main/model_allowlists"
 private const val PLACEHOLDER_FILENAME = "placeholder"
@@ -1004,10 +1007,12 @@ constructor(
 
       val responseCode: Int
       try {
-        val url = URL(model.downloadInfo.url)
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "HEAD"
-        connection.connect()
+        val connection =
+          NetworkGate.openFollowingRedirects(
+            model.downloadInfo.url,
+            NetPurpose.MODEL_DOWNLOAD,
+            method = "HEAD",
+          )
 
         responseCode = connection.responseCode
       } catch (e: Exception) {
@@ -1291,20 +1296,18 @@ constructor(
         }
 
         if (modelAllowlist == null) {
-          // Load from github.
-          var version = BuildConfig.VERSION_NAME.replace(".", "_")
-          val url = getAllowlistUrl(version)
-          Log.d(TAG, "Loading model allowlist from internet. Url: $url")
-          val data = getJsonResponse<ModelAllowlist>(url = url)
-          modelAllowlist = data?.jsonObj
-
-          if (modelAllowlist == null) {
-            Log.w(TAG, "Failed to load model allowlist from internet. Trying to load it from disk")
-            modelAllowlist = readModelAllowlistFromDisk()
-          } else {
-            Log.d(TAG, "Done: loading model allowlist from internet")
-            saveModelAllowlistToDisk(modelAllowlistContent = data?.textContent ?: "{}")
-          }
+          // Piggselle: the curated model list ships inside the APK. Nothing is fetched at startup.
+          modelAllowlist =
+            try {
+              val content =
+                context.assets.open(BUNDLED_MODEL_ALLOWLIST_ASSET).bufferedReader().use {
+                  it.readText()
+                }
+              Gson().fromJson(content, ModelAllowlist::class.java)
+            } catch (e: Exception) {
+              Log.e(TAG, "Failed to read bundled model allowlist", e)
+              null
+            }
         }
 
         if (modelAllowlist == null) {

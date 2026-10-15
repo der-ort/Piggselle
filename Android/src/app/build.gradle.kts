@@ -18,8 +18,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   alias(libs.plugins.android.application)
-  // Note: set apply to true to enable google-services (requires google-services.json).
-  alias(libs.plugins.google.services) apply false
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.protobuf)
@@ -112,9 +110,6 @@ dependencies {
   implementation(libs.hilt.android)
   implementation(libs.hilt.navigation.compose)
   implementation(libs.play.services.oss.licenses)
-  implementation(platform(libs.firebase.bom))
-  implementation(libs.firebase.analytics)
-  implementation(libs.firebase.messaging)
   implementation(libs.androidx.exifinterface)
   implementation(libs.moshi.kotlin)
   ksp(libs.hilt.android.compiler)
@@ -130,9 +125,6 @@ dependencies {
   debugImplementation(libs.androidx.ui.test.manifest)
   ksp(libs.moshi.kotlin.codegen)
   implementation(libs.mlkit.genai.prompt)
-  implementation(libs.mcp.kotlin.sdk)
-  implementation(libs.ktor.client.android)
-  implementation(libs.ktor.client.core)
   implementation(libs.tasks.vision)
   implementation(libs.tasks.retrieval)
   implementation(libs.androidx.media3.exoplayer)

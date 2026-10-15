@@ -73,7 +73,9 @@ fun MarkdownText(
               RichTextStringStyle(linkStyle = TextLinkStyles(style = SpanStyle(color = linkColor))),
           ),
       ) {
-        Markdown(content = text)
+        // Piggselle: never let rendered markdown fetch remote images. Model output can be steered
+        // by web results, and an image URL is an easy way to exfiltrate data past NetworkGate.
+        Markdown(content = com.google.ai.edge.gallery.assistant.privacy.MarkdownSanitizer.sanitize(text))
       }
     }
   }

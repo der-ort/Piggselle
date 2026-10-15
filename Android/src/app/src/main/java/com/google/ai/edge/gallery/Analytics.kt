@@ -1,5 +1,6 @@
 /*
  * Copyright 2025 Google LLC
+ * Modifications copyright 2026 Daniel (der-ort)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +17,29 @@
 
 package com.google.ai.edge.gallery
 
-import android.util.Log
-import com.google.firebase.Firebase
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.analytics.analytics
+import android.os.Bundle
 
-private var hasLoggedAnalyticsWarning = false
+/**
+ * Telemetry is removed from this fork. Firebase Analytics and Firebase Cloud Messaging are not
+ * linked into the app at all.
+ *
+ * Upstream code calls `firebaseAnalytics?.logEvent(...)` in many places. Instead of touching every
+ * call site, [firebaseAnalytics] is now permanently `null`, so those calls short-circuit and never
+ * build or send anything. [NoOpAnalytics] only exists so the call sites still type-check.
+ */
+class NoOpAnalytics private constructor() {
+  @Suppress("UNUSED_PARAMETER") fun logEvent(name: String, params: Bundle?) {}
 
-val firebaseAnalytics: FirebaseAnalytics?
-  get() =
-    runCatching { Firebase.analytics }
-      .onFailure { exception ->
-        // Firebase.analytics can throw an exception if goolgle-services is not set up, e.g.,
-        // missing google-services.json.
-        if (!hasLoggedAnalyticsWarning) {
-          Log.w("AGAnalyticsFirebase", "Firebase Analytics is not available", exception)
-        }
-      }
-      .getOrNull()
+  @Suppress("UNUSED_PARAMETER") fun setAnalyticsCollectionEnabled(enabled: Boolean) {}
+
+  object Event {
+    const val APP_OPEN = "app_open"
+  }
+}
+
+/** Always null: there is no analytics backend in this build. */
+val firebaseAnalytics: NoOpAnalytics?
+  get() = null
 
 enum class GalleryEvent(val id: String) {
   CAPABILITY_SELECT(id = "capability_select"),
@@ -53,7 +59,7 @@ enum class GalleryEvent(val id: String) {
   RESOURCE_LINK_CLICK(id = "resource_link_click"),
 }
 
-/** Strongly typed Firebase Analytics parameter keys for inference and model lifecycle telemetry. */
+/** Parameter keys kept for source compatibility with upstream call sites. Nothing is sent. */
 enum class InferenceMetricsParam(val key: String) {
   MODEL_NAME("model_name"),
   MODEL_VERSION("model_version"),

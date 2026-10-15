@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ Transport policy. Which hosts may be contacted at all is decided in code by NetworkGate;
+ this file only pins down TLS behaviour.
+
+ Cleartext is allowed at the platform level because a self-hosted SearXNG is often reached over
+ plain http inside a Tailscale tailnet or LAN. NetworkGate refuses http:// for any host that is not
+ a private, link-local, loopback or Tailscale (100.64.0.0/10, *.ts.net) address.
+ User-installed CAs are NOT trusted, so a MITM proxy cannot read search queries.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
