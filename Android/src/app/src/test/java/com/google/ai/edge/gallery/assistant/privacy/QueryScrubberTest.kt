@@ -132,4 +132,12 @@ class QueryScrubberTest {
     val r = QueryScrubber().scrub("weather berlin\n\nmy name is Daniel")
     assertFalse(r.cleaned.contains("\n"))
   }
+
+  @Test
+  fun memoryOverlapIsDetected() {
+    val memories = listOf("Sister Johanna lives in Leipzig and studies medicine.")
+    assertTrue(MemoryOverlap.overlaps("Johanna Leipzig medicine exams", memories))
+    assertFalse(MemoryOverlap.overlaps("Leipzig weather tomorrow", memories))
+    assertFalse(MemoryOverlap.overlaps("best hiking trails", memories))
+  }
 }

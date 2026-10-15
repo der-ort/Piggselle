@@ -21,6 +21,7 @@ import com.google.ai.edge.gallery.assistant.data.AssistantRepository
 import com.google.ai.edge.gallery.assistant.net.HostPolicy
 import com.google.ai.edge.gallery.assistant.net.NetPurpose
 import com.google.ai.edge.gallery.assistant.net.NetworkGate
+import com.google.ai.edge.gallery.assistant.privacy.MemoryOverlap
 import com.google.ai.edge.gallery.assistant.privacy.QueryScrubber
 import com.google.ai.edge.gallery.assistant.privacy.RedactionCategory
 import com.google.ai.edge.gallery.assistant.privacy.ScrubResult
@@ -44,8 +45,10 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "PGAssistantTools"
+private const val CONFIRM_TIMEOUT_MS = 5 * 60_000L
 
 /**
  * Asks the UI to show the scrubbed query. Completes with the query to send (possibly edited by the
@@ -55,6 +58,8 @@ class ConfirmWebSearchAction(
   val modelQuery: String,
   val scrub: ScrubResult,
   val host: String,
+  /** The query looks like it contains something from the user's memories. */
+  val touchesMemory: Boolean = false,
   val result: CompletableDeferred<String?> = CompletableDeferred(),
 ) : ToolAction(name = ToolActionName.CONFIRM_WEB_SEARCH)
 
@@ -116,12 +121,24 @@ class WebSearchTool(
       val host = HostPolicy.parseBase(policy.searxngBaseUrl)?.host ?: "your SearXNG"
       val actions: SendChannel<ToolAction> = executionContext?.actionChannel ?: fallbackActions
 
-      val needsConfirmation = !state.search.autoSend || scrub.requiresReview || scrub.isEmpty
+      val touchesMemory =
+        state.memoryEnabled && MemoryOverlap.overlaps(scrub.cleaned, state.memories.map { it.text })
+      val needsConfirmation =
+        !state.search.autoSend || scrub.requiresReview || scrub.isEmpty || touchesMemory
       val finalQuery: String? =
         if (needsConfirmation) {
-          val action = ConfirmWebSearchAction(modelQuery = query, scrub = scrub, host = host)
+          val action =
+            ConfirmWebSearchAction(
+              modelQuery = query,
+              scrub = scrub,
+              host = host,
+              touchesMemory = touchesMemory,
+            )
           actions.send(action)
-          action.result.await()
+          // If nobody answers (screen closed, app backgrounded), treat it as "don't send"
+          // instead of blocking the model forever.
+          withTimeoutOrNull(CONFIRM_TIMEOUT_MS) { action.result.await() }
+            .also { if (!action.result.isCompleted) action.result.complete(null) }
         } else {
           scrub.cleaned
         }

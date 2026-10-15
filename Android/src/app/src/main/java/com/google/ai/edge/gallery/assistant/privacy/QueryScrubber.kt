@@ -208,3 +208,26 @@ class QueryScrubber(privateTerms: Collection<String> = emptyList(), private val 
       )
   }
 }
+
+/**
+ * True if [query] shares at least two meaningful words with any single remembered fact. Used to
+ * stop auto mode when the model copied personal context into a search query.
+ */
+object MemoryOverlap {
+  private val STOP =
+    setOf(
+      "with", "from", "that", "this", "they", "their", "have", "will", "about", "into", "when",
+      "what", "which", "there", "would", "should", "could", "über", "eine", "einen", "einem",
+      "einer", "nicht", "oder", "aber", "auch", "wenn", "dann", "sich", "sind", "wird", "werden",
+      "haben", "nach", "beim", "mehr", "sehr", "prefers", "likes", "user",
+    )
+
+  private fun words(text: String): Set<String> =
+    text.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length >= 4 && it !in STOP }.toSet()
+
+  fun overlaps(query: String, memories: Collection<String>): Boolean {
+    val q = words(query)
+    if (q.size < 2) return false
+    return memories.any { m -> (words(m) intersect q).size >= 2 }
+  }
+}

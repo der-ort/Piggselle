@@ -85,6 +85,21 @@ fun WebSearchConfirmDialog(action: ConfirmWebSearchAction, onFinished: () -> Uni
           modifier = Modifier.fillMaxWidth(),
         )
 
+        if (action.touchesMemory) {
+          Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            shape = MaterialTheme.shapes.medium,
+          ) {
+            Text(
+              "This query looks like it contains something from your memories. Check it before " +
+                "sending.",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onErrorContainer,
+              modifier = Modifier.padding(12.dp),
+            )
+          }
+        }
+
         val health = action.scrub.healthFlags
         if (health.isNotEmpty()) {
           Surface(
