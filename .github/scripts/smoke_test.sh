@@ -58,6 +58,24 @@ report_and_fail() {
   exit 1
 }
 
+dump_screen() {
+  adb exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
+  local focus
+  focus=$(adb shell dumpsys window | grep -m1 -E "mCurrentFocus|mFocusedApp" | tr -s ' ')
+  echo "::error title=Focused window::$focus"
+  python3 - "$OUT/ui.xml" <<'PY' | head -40 | while IFS= read -r l; do echo "::error title=On screen::$l"; done
+import re, sys, html
+xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+for m in re.finditer(r'<node [^>]*>', xml):
+    n = m.group(0)
+    t = re.search(r' text="([^"]+)"', n)
+    d = re.search(r' content-desc="([^"]+)"', n)
+    b = re.search(r'bounds="([^"]+)"', n)
+    if t or d:
+        print(f"{html.unescape(t.group(1)) if t else ''} | desc={html.unescape(d.group(1)) if d else ''} | {b.group(1) if b else ''}")
+PY
+}
+
 has_text() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
   adb pull /sdcard/ui.xml "$OUT/ui.xml" > /dev/null 2>&1
@@ -67,7 +85,7 @@ has_text() {
 expect_text() {
   for _ in $(seq 1 10); do has_text "$1" && return 0; sleep 2; done
   echo "::error title=Smoke test::Expected to see '$1' on screen"
-  adb exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
+  dump_screen
   exit 1
 }
 
