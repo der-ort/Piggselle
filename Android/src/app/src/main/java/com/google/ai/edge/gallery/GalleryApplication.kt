@@ -31,6 +31,8 @@ class GalleryApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    // Piggselle: local-only crash reports, shown on next launch.
+    com.google.ai.edge.gallery.assistant.CrashReporter.install(this)
     // Initialize the notification schedule manager to load the scheduled notifications from the
     // disk.
     notificationScheduleManager.initialize()

@@ -6,7 +6,7 @@ on:
     branches: ["main", "piggselle-wip"]
     paths:
       - "Android/**"
-      - ".github/workflows/piggselle.yml"
+      - ".github/**"
     tags: ["v*"]
 
 permissions:
@@ -20,6 +20,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      version: ${{ steps.apk.outputs.version }}
+      signed: ${{ steps.apk.outputs.signed }}
+      apk_name: ${{ steps.apk.outputs.name }}
     defaults:
       run:
         working-directory: ./Android/src
@@ -77,6 +81,7 @@ jobs:
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"
           echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename $OUT)" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [ -n "$PIGGSELLE_KEYSTORE" ]; then echo "signed=true" >> "$GITHUB_OUTPUT"; else echo "signed=false" >> "$GITHUB_OUTPUT"; fi
 
@@ -130,12 +135,76 @@ jobs:
           name: test-reports
           path: Android/src/app/build/reports/tests/
 
+  smoke:
+    name: Emulator smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK platform 37
+        run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0" > /dev/null
+
+      - name: Build debug APK
+        working-directory: ./Android/src
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E "^e: |What went wrong|ERROR:" -A3 "$RUNNER_TEMP/build.log" | head -60 | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          }
+          echo "DEBUG_APK=$(ls $PWD/app/build/outputs/apk/debug/*.apk | head -n1)" >> "$GITHUB_ENV"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          ram-size: 4096M
+          disk-size: 8G
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          disable-animations: true
+          script: bash .github/scripts/smoke_test.sh "$DEBUG_APK"
+
+      - name: Upload smoke test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: ${{ runner.temp }}/smoke/
+          if-no-files-found: ignore
+
+  release:
+    name: Publish release
+    needs: [build, smoke]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: piggselle-apk
+          path: dist
+
       - name: Check whether this version is already released
         id: existing
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v${{ steps.apk.outputs.version }}"
+          TAG="v${{ needs.build.outputs.version }}"
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice title=Release::$TAG already exists; bump versionName and versionCode to publish an update."
@@ -146,19 +215,19 @@ jobs:
       - name: Publish release (for Obtainium)
         # main publishes v<versionName> once; bump versionName/versionCode in app/build.gradle.kts
         # to ship an update. Debug-signed builds are marked as pre-releases.
-        if: (github.ref == 'refs/heads/main' && steps.existing.outputs.exists != 'true') || startsWith(github.ref, 'refs/tags/v')
+        if: steps.existing.outputs.exists != 'true' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.apk.outputs.version) }}
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.build.outputs.version) }}
           target_commitish: ${{ github.sha }}
-          name: Piggselle ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.apk.outputs.version) }}
+          name: Piggselle ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.build.outputs.version) }}
           files: |
-            ${{ steps.apk.outputs.path }}
-            ${{ steps.apk.outputs.path }}.sha256
+            dist/${{ needs.build.outputs.apk_name }}
+            dist/${{ needs.build.outputs.apk_name }}.sha256
           overwrite_files: true
           generate_release_notes: true
-          prerelease: ${{ steps.apk.outputs.signed != 'true' || contains(steps.apk.outputs.version, '-') }}
+          prerelease: ${{ needs.build.outputs.signed != 'true' || contains(needs.build.outputs.version, '-') }}
           body: |
-            ${{ steps.apk.outputs.signed != 'true' && '⚠️ Test build signed with a throwaway debug key. Updates to a properly signed release will need an uninstall first (chats and memories are lost). See README → Release signing.' || 'Signed release.' }}
+            ${{ needs.build.outputs.signed != 'true' && '⚠️ Test build signed with a throwaway debug key. Moving to another build (including a properly signed release) needs an uninstall first, which deletes chats and memories. See README → Release signing.' || 'Signed release.' }}
 
-            SHA-256 is attached. Built by GitHub Actions from ${{ github.sha }}.
+            Passed unit tests, APK privacy checks and an emulator smoke test. SHA-256 attached. Built from ${{ github.sha }}.

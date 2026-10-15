@@ -814,7 +814,8 @@ private fun TaskList(
     initialAnimationDone = true
   }
 
-  val taskIds = listOf(BuiltInTaskId.SMART_ALBUM, BuiltInTaskId.VIDEO_MOMENT_FINDER)
+  // Piggselle: feature the assistant at the top. Smart Album / Video Moment Finder were removed.
+  val taskIds = listOf(BuiltInTaskId.LLM_AGENT_CHAT)
 
   // The highlighted tiles at the top.
   Column(
@@ -830,18 +831,19 @@ private fun TaskList(
         BuiltInTaskId.LLM_CHAT to stringResource(R.string.gemma_reskin_try_gemma_4_chat),
         // use "\u00a0" to make sure the word before and after it should always be together when
         // wrapping lines.
-        BuiltInTaskId.LLM_AGENT_CHAT to stringResource(R.string.gemma_reskin_try_gemma_4_skills),
+        BuiltInTaskId.LLM_AGENT_CHAT to stringResource(R.string.task_desc_agent_skills),
         BuiltInTaskId.SMART_ALBUM to stringResource(R.string.task_desc_smart_album),
         BuiltInTaskId.VIDEO_MOMENT_FINDER to stringResource(R.string.task_desc_video_moment_finder),
       )
-    for (task in taskIds.map { modelManagerViewModel.getTaskById(it)!! }) {
+    // Never crash on a missing task: skip featured tiles whose task isn't in this build.
+    for (task in taskIds.mapNotNull { modelManagerViewModel.getTaskById(it) }) {
       TaskCard(
         task = task,
         index = 0,
         animate = !initialAnimationDone && enableAnimation,
         onClick = { navigateToTaskScreen(task) },
         modifier = Modifier.fillMaxWidth(),
-        description = chatToDescription[task.id]!!,
+        description = chatToDescription[task.id] ?: task.shortDescription,
       )
     }
 
@@ -863,7 +865,8 @@ private fun TaskList(
     verticalAlignment = Alignment.Top,
     contentPadding = PaddingValues(horizontal = 20.dp),
   ) { pageIndex ->
-    val tasks = tasksByCategories[sortedCategories[pageIndex].id]!!.filter { it.id !in taskIds }
+    val tasks =
+      tasksByCategories[sortedCategories[pageIndex].id].orEmpty().filter { it.id !in taskIds }
     Column(
       verticalArrangement = Arrangement.spacedBy(16.dp),
       modifier =

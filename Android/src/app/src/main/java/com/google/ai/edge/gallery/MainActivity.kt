@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity(), VirtualDevicePermissionsHost {
     // This prevents Jetpack Compose from automatically restoring the previous screen
     // and forces the app to start cleanly on the Home Screen after an OS kill.
     super.onCreate(null)
+    com.google.ai.edge.gallery.assistant.CrashReporter.showIfPresent(this)
 
     // Debug: Dump all intent extras to see what FCM unloads
     intent.extras?.let { extras ->

@@ -35,8 +35,8 @@ android {
     applicationId = "io.github.derort.piggselle"
     minSdk = 31
     targetSdk = 37
-    versionCode = 1
-    versionName = "0.1.0"
+    versionCode = 2
+    versionName = "0.1.1"
 
     // Needed for HuggingFace auth workflows.
     // Use the scheme of the "Redirect URLs" in HuggingFace app.
@@ -72,11 +72,11 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig =
         signingConfigs.findByName("piggselle") ?: signingConfigs.getByName("debug")
+      // Pixel 9 Pro is arm64-v8a only; dropping other ABIs keeps the release APK smaller.
+      // Debug builds keep all ABIs so CI can smoke-test them on an x86_64 emulator.
+      ndk { abiFilters += listOf("arm64-v8a") }
     }
   }
-
-  // Pixel 9 Pro is arm64-v8a only; dropping other ABIs keeps the APK smaller.
-  defaultConfig { ndk { abiFilters += listOf("arm64-v8a") } }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
