@@ -10,7 +10,17 @@ A private, offline-first AI assistant for Android, tuned for the **Pixel 9 Pro**
 - **Knowledge base**: point it at a notes folder (Markor, Obsidian, Markdown, text, CSV, JSON,
   HTML). Relevant passages are added to your messages, with the source files shown. Keyword
   search works immediately; optional **EmbeddingGemma 2** adds semantic search, all on-device.
-- **Any LiteRT model from Hugging Face**: search Hugging Face or paste a repo URL in *Models*.
+- **Any LiteRT model from Hugging Face**: hand-picked community models (Qwen, Phi, Ministral,
+  Granite, LFM, Bonsai, vision models…) in *Models*, plus search over every `.litertlm` model
+  or a pasted repo URL.
+- **Shared models folder** (optional, *Settings → Models folder*): models, Whisper and the
+  embedding model live in a folder like `/storage/emulated/0/Models`, survive reinstalls, and
+  other apps can import from it. `.litertlm` files you drop in are picked up automatically.
+  Needs file access; on GrapheneOS, enable *Storage Scopes* and add just that folder.
+- **Share to Piggselle**: share text, links, images or text files from any app; they open in a
+  new chat's message box and nothing is sent until you tap send.
+- **Images you send are kept** (encrypted) with the chat; tap one to view it full screen.
+- **Voice input** with on-device Whisper (choose the size), or send audio straight to Gemma.
 - **Persona**: editable instructions, a name for you, several personas to switch between.
 - **Memory**: the model *proposes* lasting facts about you; nothing is saved until you approve,
   edit or drop it. Memories are AES-GCM encrypted with an Android Keystore key.
