@@ -228,7 +228,7 @@ object ModelFolder {
       found += entry.toImported()
       names += entry.fileName
     }
-    val candidates = (File(dir, IMPORTS_DIR).listFiles().orEmpty() + dir.listFiles().orEmpty()).filter {
+    val candidates = (File(dir, IMPORTS_DIR).listFiles()?.toList().orEmpty() + dir.listFiles()?.toList().orEmpty()).filter {
       it.isFile && it.name.endsWith(".litertlm") && it.length() > 0
     }
     for (file in candidates) {
