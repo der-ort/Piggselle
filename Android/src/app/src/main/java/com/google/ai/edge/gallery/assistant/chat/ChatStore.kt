@@ -17,6 +17,11 @@
 package com.google.ai.edge.gallery.assistant.chat
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.LruCache
+import android.util.Log
+import java.io.ByteArrayOutputStream
 import com.google.ai.edge.gallery.assistant.storage.SecureStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
@@ -33,7 +38,11 @@ import kotlinx.serialization.builtins.ListSerializer
 
 private const val INDEX_FILE = "chats_index.bin"
 
-private fun chatFile(id: String) = "chat_${id.filter { it.isLetterOrDigit() || it == '-' }}.bin"
+private fun safe(id: String) = id.filter { it.isLetterOrDigit() || it == '-' }
+
+private fun chatFile(id: String) = "chat_${safe(id)}.bin"
+
+private fun imageFile(chatId: String, messageId: String, index: Int) = "img_${safe(chatId)}_${safe(messageId)}_$index.bin"
 
 @Serializable
 data class ChatFolder(
@@ -97,6 +106,18 @@ private data class ChatIndex(
 class ChatStore @Inject constructor(@ApplicationContext private val context: Context) {
   private val writer = Executors.newSingleThreadExecutor()
   private val messageCache = ConcurrentHashMap<String, List<StoredMessage>>()
+  /** Images of private chats, which are never written. Keyed by message id. */
+  private val privateImages = ConcurrentHashMap<String, List<Bitmap>>()
+  /** Recently decrypted images of saved chats, bounded by bitmap memory. */
+  private val decodedImages =
+    object : LruCache<String, List<Bitmap>>(48 * 1024 * 1024) {
+      override fun sizeOf(key: String, value: List<Bitmap>) = value.sumOf { it.allocationByteCount }.coerceAtLeast(1)
+    }
+
+  private fun forgetImages(messageId: String) {
+    privateImages.remove(messageId)
+    decodedImages.remove(messageId)
+  }
 
   private val _folders = MutableStateFlow<List<ChatFolder>>(emptyList())
   val folders: StateFlow<List<ChatFolder>> = _folders.asStateFlow()
@@ -151,10 +172,15 @@ class ChatStore @Inject constructor(@ApplicationContext private val context: Con
   fun deleteChat(id: String) {
     val wasPrivate = chat(id)?.isPrivate ?: true
     _chats.update { list -> list.filterNot { it.id == id } }
+    messages(id).forEach { forgetImages(it.id) }
     messageCache.remove(id)
     if (!wasPrivate) {
       persistIndex()
-      writer.execute { SecureStore.delete(context, chatFile(id)) }
+      writer.execute {
+        SecureStore.delete(context, chatFile(id))
+        val prefix = "img_${safe(id)}_"
+        SecureStore.dir(context).listFiles()?.filter { it.name.startsWith(prefix) }?.forEach { it.delete() }
+      }
     }
   }
 
@@ -163,7 +189,10 @@ class ChatStore @Inject constructor(@ApplicationContext private val context: Con
     val private = _chats.value.filter { it.isPrivate }.map { it.id }
     if (private.isEmpty()) return
     _chats.update { list -> list.filterNot { it.isPrivate } }
-    private.forEach { messageCache.remove(it) }
+    private.forEach { id ->
+      messageCache[id]?.forEach { forgetImages(it.id) }
+      messageCache.remove(id)
+    }
   }
 
   fun messages(id: String): List<StoredMessage> {
@@ -178,6 +207,8 @@ class ChatStore @Inject constructor(@ApplicationContext private val context: Con
   }
 
   fun setMessages(id: String, messages: List<StoredMessage>) {
+    val kept = messages.mapTo(HashSet()) { it.id }
+    val dropped = messageCache[id].orEmpty().filter { it.id !in kept && it.imageCount > 0 }
     messageCache[id] = messages
     val meta = chat(id) ?: return
     _chats.update { list ->
@@ -187,11 +218,59 @@ class ChatStore @Inject constructor(@ApplicationContext private val context: Con
     if (!meta.isPrivate) {
       persistIndex()
       val snapshot = messages.toList()
-      writer.execute { SecureStore.write(context, chatFile(id), ListSerializer(StoredMessage.serializer()), snapshot) }
+      writer.execute {
+        SecureStore.write(context, chatFile(id), ListSerializer(StoredMessage.serializer()), snapshot)
+        // Images of removed messages (e.g. on regenerate) go with them.
+        dropped.forEach { m -> repeat(m.imageCount) { i -> SecureStore.delete(context, imageFile(id, m.id, i)) } }
+      }
     }
+    dropped.forEach { forgetImages(it.id) }
   }
 
   fun newMessageId(): String = UUID.randomUUID().toString()
+
+  // ---- Images ---------------------------------------------------------------------------------
+
+  /** Keeps a message's images: encrypted on disk for normal chats, in memory for private ones. */
+  fun saveImages(chatId: String, messageId: String, images: List<Bitmap>) {
+    if (images.isEmpty()) return
+    val copy = images.toList()
+    if (chat(chatId)?.isPrivate != false) {
+      privateImages[messageId] = copy
+      return
+    }
+    decodedImages.put(messageId, copy)
+    writer.execute {
+      copy.forEachIndexed { i, bmp ->
+        runCatching {
+            val bytes = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }.toByteArray()
+            SecureStore.writeBytes(SecureStore.file(context, imageFile(chatId, messageId, i)), bytes)
+          }
+          .onFailure { Log.e("ChatStore", "Could not save image", it) }
+      }
+    }
+  }
+
+  /** Loads a message's images (blocking; call off the main thread). */
+  fun loadImages(chatId: String, messageId: String, count: Int): List<Bitmap> {
+    privateImages[messageId]?.let {
+      return it
+    }
+    decodedImages.get(messageId)?.let {
+      return it
+    }
+    val loaded =
+      (0 until count).mapNotNull { i ->
+        runCatching {
+            SecureStore.readBytes(SecureStore.file(context, imageFile(chatId, messageId, i)))?.let {
+              BitmapFactory.decodeByteArray(it, 0, it.size)
+            }
+          }
+          .getOrNull()
+      }
+    if (loaded.isNotEmpty()) decodedImages.put(messageId, loaded)
+    return loaded
+  }
 
   // ---- Folders --------------------------------------------------------------------------------
 

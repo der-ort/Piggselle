@@ -288,6 +288,13 @@ constructor(
 
   fun activeChat(): ChatMeta? = store.chat(_activeChatId.value)
 
+  /** Images attached to a message in the open chat (blocking; call off the main thread). */
+  fun loadImages(message: UiMessage): List<Bitmap> {
+    if (message.images.isNotEmpty()) return message.images
+    val chatId = _activeChatId.value ?: return emptyList()
+    return store.loadImages(chatId, message.id, message.imageCount)
+  }
+
   /** Effective settings for the open chat (or the draft). */
   fun isPrivate(): Boolean = activeChat()?.isPrivate ?: _draft.value.isPrivate
 
@@ -428,6 +435,7 @@ constructor(
         imageCount = images.size,
       )
     store.setMessages(chat.id, past + userMsg)
+    store.saveImages(chat.id, userMsg.id, images)
     val assistantId = store.newMessageId()
     _messages.value =
       past.map { it.toUi() } +
@@ -546,11 +554,13 @@ constructor(
     val msgs = store.messages(id)
     val lastUser = msgs.indexOfLast { it.role == Role.USER }
     if (lastUser < 0) return
-    val text = msgs[lastUser].text
+    val last = msgs[lastUser]
+    // Keep the question's images (decoded before the old message and its files are dropped).
+    val images = if (last.imageCount > 0) store.loadImages(id, last.id, last.imageCount) else emptyList()
     store.setMessages(id, msgs.subList(0, lastUser))
     _messages.value = store.messages(id).map { it.toUi() }
     boundKey = null
-    send(text)
+    send(last.text, images)
   }
 
   /** Updates the status line of the message being generated (called for tool progress). */

@@ -174,6 +174,8 @@ fun ChatScreen(
   var input by remember { mutableStateOf("") }
   val images = remember { mutableStateListOf<Bitmap>() }
   var menuOpen by remember { mutableStateOf(false) }
+  /** Images open in the full-screen viewer, and whether they come from the input bar. */
+  var viewer by remember { mutableStateOf<Triple<List<Bitmap>, Int, Boolean>?>(null) }
 
   // ---- Voice ----
   val recorder = remember { VoiceRecorder(scope) }
@@ -375,6 +377,7 @@ fun ChatScreen(
             onTextChange = { input = it },
             images = images,
             onRemoveImage = { images.removeAt(it) },
+            onOpenImage = { viewer = Triple(images.toList(), it, true) },
             onPickImage =
               if (currentModel?.supportImage == true) {
                 { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
@@ -451,6 +454,8 @@ fun ChatScreen(
                 isLast = i == messages.lastIndex,
                 canRegenerate = !generating,
                 onRegenerate = { engine.regenerate() },
+                loadImages = { msg -> withContext(Dispatchers.IO) { engine.loadImages(msg) } },
+                onOpenImage = { list, index -> viewer = Triple(list, index, false) },
               )
             }
           }
@@ -462,6 +467,18 @@ fun ChatScreen(
   // ---- Dialogs --------------------------------------------------------------------------------
 
   pendingSearch?.let { WebSearchConfirmDialog(action = it, onFinished = { pendingSearch = null }) }
+
+  viewer?.let { (list, index, fromInput) ->
+    ImageViewer(
+      images = list,
+      startIndex = index,
+      onAttach =
+        if (!fromInput && currentModel?.supportImage == true && images.size < 4) {
+          { bmp -> images.add(bmp) }
+        } else null,
+      onDismiss = { viewer = null },
+    )
+  }
 
   when (val d = dialog) {
     is ChatDialog.Rename ->

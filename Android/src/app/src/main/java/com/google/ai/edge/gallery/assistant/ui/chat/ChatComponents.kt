@@ -75,6 +75,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -102,16 +103,25 @@ fun MessageRow(
   isLast: Boolean,
   canRegenerate: Boolean,
   onRegenerate: () -> Unit,
+  loadImages: suspend (UiMessage) -> List<Bitmap> = { it.images },
+  onOpenImage: (List<Bitmap>, Int) -> Unit = { _, _ -> },
 ) {
   val clipboard = LocalClipboardManager.current
   if (message.role == Role.USER) {
+    // Live messages carry their bitmaps; saved ones are decrypted on demand.
+    val shown by
+      produceState(initialValue = message.images, message.id, message.imageCount) {
+        if (value.isEmpty() && message.imageCount > 0) value = loadImages(message)
+      }
     Column(
       modifier = Modifier.fillMaxWidth().padding(start = 48.dp),
       horizontalAlignment = Alignment.End,
     ) {
-      if (message.images.isNotEmpty()) {
+      if (shown.isNotEmpty()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
-          message.images.take(4).forEach { bmp -> Thumbnail(bmp, 96) }
+          shown.take(4).forEachIndexed { i, bmp ->
+            Thumbnail(bmp, 96, onClick = { onOpenImage(shown, i) })
+          }
         }
       } else if (message.imageCount > 0) {
         Text(
@@ -216,12 +226,15 @@ private fun TypingDots() {
 }
 
 @Composable
-private fun Thumbnail(bitmap: Bitmap, sizeDp: Int) {
+private fun Thumbnail(bitmap: Bitmap, sizeDp: Int, onClick: (() -> Unit)? = null) {
   Image(
     bitmap = bitmap.asImageBitmap(),
-    contentDescription = null,
+    contentDescription = if (onClick != null) "Open image" else null,
     contentScale = ContentScale.Crop,
-    modifier = Modifier.size(sizeDp.dp).clip(RoundedCornerShape(12.dp)),
+    modifier =
+      Modifier.size(sizeDp.dp).clip(RoundedCornerShape(12.dp)).let {
+        if (onClick != null) it.clickable(onClick = onClick) else it
+      },
   )
 }
 
@@ -233,6 +246,7 @@ fun ChatInputBar(
   onTextChange: (String) -> Unit,
   images: List<Bitmap>,
   onRemoveImage: (Int) -> Unit,
+  onOpenImage: (Int) -> Unit = {},
   onPickImage: (() -> Unit)?,
   generating: Boolean,
   enabled: Boolean,
@@ -250,7 +264,7 @@ fun ChatInputBar(
         ) {
           images.forEachIndexed { i, bmp ->
             Box {
-              Thumbnail(bmp, 56)
+              Thumbnail(bmp, 56, onClick = { onOpenImage(i) })
               Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface,
