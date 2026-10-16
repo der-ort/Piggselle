@@ -31,6 +31,9 @@ import com.google.ai.edge.gallery.assistant.AssistantPromptBuilder
 import com.google.ai.edge.gallery.assistant.data.AssistantRepository
 import com.google.ai.edge.gallery.assistant.knowledge.KnowledgeBase
 import com.google.ai.edge.gallery.assistant.knowledge.KnowledgePrompt
+import com.google.ai.edge.gallery.assistant.models.ModelSettingsStore
+import com.google.ai.edge.gallery.assistant.models.SamplingOverride
+import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.assistant.tools.AssistantTools
 import com.google.ai.edge.gallery.customtasks.agentchat.isWebSearchAvailable
 import com.google.ai.edge.gallery.data.BuiltInTaskId
@@ -106,6 +109,7 @@ constructor(
   private val knowledge: KnowledgeBase,
   private val llmSessionManager: LlmSessionManager,
   @AgentChatExecutor private val executor: AgentRuntimeExecutor,
+  private val modelSettings: ModelSettingsStore,
 ) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val bindLock = Mutex()
@@ -186,6 +190,31 @@ constructor(
     preload()
   }
 
+  /**
+   * Saves the user's settings for [model]. Accelerator, context length and speculative decoding
+   * need the model to be loaded again; everything else applies to the next message.
+   */
+  fun applyModelSettings(model: Model, values: Map<String, Any>?) {
+    val reload = if (values == null) modelSettings.reset(model) else modelSettings.save(model, values)
+    boundKey = null
+    if (reload && model.instance != null) {
+      val mmvm = mmvmRef.get() ?: return
+      val task = mmvm.getTaskById(BuiltInTaskId.LLM_AGENT_CHAT) ?: return
+      stop()
+      mmvm.cleanupModel(context, task, model, onDone = { preload() })
+    }
+  }
+
+  private fun overrideFor(chat: ChatMeta?): SamplingOverride? {
+    val folder = store.folder(chat?.folderId ?: _draft.value.folderId) ?: return null
+    if (folder.temperature == null && folder.thinking == null) return null
+    return SamplingOverride(temperature = folder.temperature, thinking = folder.thinking)
+  }
+
+  /** Whether the open chat will use the model's thinking mode. */
+  fun thinkingOn(model: Model, chat: ChatMeta?): Boolean =
+    modelSettings.effectiveValues(model, overrideFor(chat))[ConfigKeys.ENABLE_THINKING.label] == true
+
   /** Starts loading the model in the background so the first message is quick. */
   fun preload() {
     val mmvm = mmvmRef.get() ?: return
@@ -206,7 +235,10 @@ constructor(
       for (m in task.models) {
         if (m.name != model.name && m.instance != null) mmvm.cleanupModel(context, task, m)
       }
-      if (!model.initializing) mmvm.initializeModel(context, task, model)
+      if (!model.initializing) {
+        modelSettings.applyTo(model)
+        mmvm.initializeModel(context, task, model)
+      }
       val status =
         withTimeout(180_000) {
           model.initStatusFlow.first {
@@ -323,7 +355,11 @@ constructor(
       ensureModel(mmvm, model)
       val task = mmvm.getTaskById(BuiltInTaskId.LLM_AGENT_CHAT) ?: error("Assistant task missing")
       val prompt = systemPromptFor(chat)
-      val key = "${chat.id}|${model.name}|${prompt.hashCode()}|${System.identityHashCode(model.instance)}"
+      // Sampling settings (with folder overrides) are read when the conversation is created.
+      val values = modelSettings.effectiveValues(model, overrideFor(chat))
+      model.configValues = values
+      val key =
+        "${chat.id}|${model.name}|${prompt.hashCode()}|${values.hashCode()}|${System.identityHashCode(model.instance)}"
       if (key == boundKey && charsSinceBind < REBIND_CHAR_THRESHOLD) return
       tools.privateMode = chat.isPrivate
       executor.resetSession(
@@ -346,9 +382,16 @@ constructor(
 
   // ---- Sending --------------------------------------------------------------------------------
 
-  fun send(text: String, images: List<Bitmap> = emptyList()) {
+  /** True if the current model can listen to audio directly (e.g. Gemma 4, Gemma 3n). */
+  fun canHearAudio(): Boolean = mmvmRef.get()?.let { currentModel(it)?.supportAudio } == true
+
+  /**
+   * @param audioWav optional 16 kHz mono WAV sent to the model as audio (only for models that
+   *   support audio input).
+   */
+  fun send(text: String, images: List<Bitmap> = emptyList(), audioWav: ByteArray? = null) {
     val clean = text.trim()
-    if (clean.isEmpty() && images.isEmpty()) return
+    if (clean.isEmpty() && images.isEmpty() && audioWav == null) return
     if (_generating.value) return
     val mmvm = mmvmRef.get() ?: return
     val model = currentModel(mmvm) ?: run {
@@ -359,7 +402,10 @@ constructor(
     val chat =
       activeChat()
         ?: store.createChat(
-            title = clean.lineSequence().firstOrNull().orEmpty().take(48).ifBlank { "Image" },
+            title =
+              clean.lineSequence().firstOrNull().orEmpty().take(48).ifBlank {
+                if (audioWav != null) "Voice message" else "Image"
+              },
             folderId = _draft.value.folderId,
             isPrivate = _draft.value.isPrivate,
           )
@@ -377,7 +423,7 @@ constructor(
       StoredMessage(
         id = store.newMessageId(),
         role = Role.USER,
-        text = clean,
+        text = clean.ifEmpty { if (audioWav != null) "🎤 Voice message" else "" },
         timeMs = System.currentTimeMillis(),
         imageCount = images.size,
       )
@@ -411,7 +457,14 @@ constructor(
           }
 
           val attachments =
-            if (model.supportImage) images.map { Attachment.ImageBitmap(it) } else emptyList()
+            (if (model.supportImage) images.map { Attachment.ImageBitmap(it) } else emptyList()) +
+              (if (audioWav != null && model.supportAudio) listOf(Attachment.AudioBytes(audioWav)) else emptyList())
+          if (audioWav != null && !model.supportAudio) {
+            prompt = "$prompt\n\n(The user sent a voice message, but this model can't hear audio.)"
+          }
+          if (audioWav != null && clean.isEmpty() && model.supportAudio) {
+            prompt = "Listen to my voice message and respond to it."
+          }
           if (images.isNotEmpty() && attachments.isEmpty()) {
             prompt = "$prompt\n\n(The user attached ${images.size} image(s), but this model can't see images.)"
           }
@@ -422,7 +475,12 @@ constructor(
               AgentRequest(
                 query = prompt,
                 attachments = attachments,
-                metadata = mapOf(AgentRequest.SESSION_ID to chat.id),
+                metadata =
+                  mapOf(
+                    AgentRequest.SESSION_ID to chat.id,
+                    AgentRequest.LITERTLM_EXTRA_CONTEXT to
+                      mapOf("enable_thinking" to thinkingOn(model, chat).toString()),
+                  ),
               ),
             )
             .collect { event ->

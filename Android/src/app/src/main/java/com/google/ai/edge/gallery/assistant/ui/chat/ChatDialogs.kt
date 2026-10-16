@@ -31,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -103,6 +105,9 @@ fun FolderEditorDialog(
   var name by remember { mutableStateOf(folder.name) }
   var prompt by remember { mutableStateOf(folder.systemPrompt) }
   var kb by remember { mutableStateOf(folder.useKnowledge) }
+  var customTemp by remember { mutableStateOf(folder.temperature != null) }
+  var temp by remember { mutableStateOf(folder.temperature ?: 0.7f) }
+  var thinking by remember { mutableStateOf(folder.thinking) }
   var confirmDelete by remember { mutableStateOf(false) }
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -129,6 +134,19 @@ fun FolderEditorDialog(
         if (knowledgeConfigured) {
           TriStateRow("Search my notes", kb, "Use the global default") { kb = it }
         }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { customTemp = !customTemp }) {
+          Checkbox(checked = customTemp, onCheckedChange = { customTemp = it })
+          Text(if (customTemp) "Temperature: ${"%.2f".format(temp)}" else "Temperature: model default", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (customTemp) {
+          Slider(value = temp, onValueChange = { temp = (it * 20).toInt() / 20f }, valueRange = 0f..2f)
+          Text(
+            "Lower is more focused and repeatable, higher is more creative.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        TriStateRow("Thinking mode (models that support it)", thinking, "Use the model's setting") { thinking = it }
         if (onDelete != null) {
           TextButton(onClick = { confirmDelete = true }) {
             Text("Delete folder", color = MaterialTheme.colorScheme.error)
@@ -139,7 +157,17 @@ fun FolderEditorDialog(
     confirmButton = {
       Button(
         enabled = name.isNotBlank(),
-        onClick = { onSave(folder.copy(name = name.trim(), systemPrompt = prompt.trim(), useKnowledge = kb)) },
+        onClick = {
+          onSave(
+            folder.copy(
+              name = name.trim(),
+              systemPrompt = prompt.trim(),
+              useKnowledge = kb,
+              temperature = if (customTemp) temp else null,
+              thinking = thinking,
+            )
+          )
+        },
       ) {
         Text("Save")
       }

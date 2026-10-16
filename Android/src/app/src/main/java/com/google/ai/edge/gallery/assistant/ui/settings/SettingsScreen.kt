@@ -27,6 +27,8 @@ import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,16 +66,25 @@ private enum class Sheet {
   KNOWLEDGE,
   PRIVACY,
   ABOUT,
+  VOICE,
+  MODEL_PICK,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenModels: () -> Unit, vm: ChatViewModel = hiltViewModel()) {
+fun SettingsScreen(
+  onBack: () -> Unit,
+  onOpenModels: () -> Unit,
+  modelManagerViewModel: com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel,
+  vm: ChatViewModel = hiltViewModel(),
+) {
   val context = LocalContext.current
   val assistant by vm.repository.state.collectAsState()
   val kb by vm.knowledge.state.collectAsState()
   val policy by NetworkGate.policy.collectAsState()
   var sheet by remember { mutableStateOf<Sheet?>(null) }
+  var settingsFor by remember { mutableStateOf<com.google.ai.edge.gallery.data.Model?>(null) }
+  val whisperStatus by vm.whisper.status.collectAsState()
 
   Scaffold(
     topBar = {
@@ -117,6 +128,20 @@ fun SettingsScreen(onBack: () -> Unit, onOpenModels: () -> Unit, vm: ChatViewMod
         SettingRow(Icons.Outlined.Shield, "Privacy & web search", web) { sheet = Sheet.PRIVACY }
       }
       item { SettingRow(Icons.Outlined.Memory, "Models", "Download, import from Hugging Face, delete") { onOpenModels() } }
+      item {
+        SettingRow(Icons.Outlined.Tune, "Model settings", "Temperature, context length, accelerator, thinking") {
+          sheet = Sheet.MODEL_PICK
+        }
+      }
+      item {
+        val voice =
+          when (val w = whisperStatus) {
+            is com.google.ai.edge.gallery.assistant.voice.WhisperStatus.Ready -> "Whisper ${w.size.label}"
+            is com.google.ai.edge.gallery.assistant.voice.WhisperStatus.Downloading -> "Downloading Whisper…"
+            else -> "Not set up"
+          }
+        SettingRow(Icons.Outlined.Mic, "Voice input", voice) { sheet = Sheet.VOICE }
+      }
       item { HorizontalDivider() }
       item { SettingRow(Icons.Outlined.Info, "About Piggselle", "Version ${BuildConfig.VERSION_NAME}") { sheet = Sheet.ABOUT } }
       item {
@@ -146,10 +171,41 @@ fun SettingsScreen(onBack: () -> Unit, onOpenModels: () -> Unit, vm: ChatViewMod
     Sheet.KNOWLEDGE ->
       KnowledgeSheet(vm.knowledge, vm.embedder, onDismiss = { sheet = null }, onChanged = { vm.engine.settingsChanged() })
     Sheet.PRIVACY -> PrivacySheet(vm.repository, onDismiss = { sheet = null }, onWebSearchChanged = { vm.engine.settingsChanged() })
+    Sheet.VOICE -> VoiceSheet(vm.whisper, onDismiss = { sheet = null })
+    Sheet.MODEL_PICK -> {
+      val models = vm.engine.downloadedChatModels(modelManagerViewModel)
+      androidx.compose.material3.AlertDialog(
+        onDismissRequest = { sheet = null },
+        title = { Text("Model settings") },
+        text = {
+          androidx.compose.foundation.layout.Column {
+            if (models.isEmpty()) Text("No models downloaded yet.")
+            models.forEach { m ->
+              ListItem(
+                headlineContent = { Text(m.displayName.ifEmpty { m.name }) },
+                supportingContent = { if (vm.modelSettings.hasCustomValues(m)) Text("Customized") },
+                modifier = Modifier.clickable { settingsFor = m; sheet = null },
+              )
+            }
+          }
+        },
+        confirmButton = {},
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { sheet = null }) { Text("Close") } },
+      )
+    }
     Sheet.ABOUT -> {
       AppTosDialog(onTosAccepted = { sheet = null }, viewingMode = true)
     }
     null -> {}
+  }
+
+  settingsFor?.let { m ->
+    ModelSettingsSheet(
+      model = m,
+      settings = vm.modelSettings,
+      onApply = { values -> vm.engine.applyModelSettings(m, values) },
+      onDismiss = { settingsFor = null },
+    )
   }
 }
 

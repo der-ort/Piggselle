@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.google.ai.edge.gallery.assistant.data.AssistantRepository
+import com.google.ai.edge.gallery.assistant.net.CertInfo
 import com.google.ai.edge.gallery.assistant.net.HostPolicy
 import com.google.ai.edge.gallery.assistant.net.NetLogEntry
 import com.google.ai.edge.gallery.assistant.net.NetPurpose
@@ -85,6 +86,7 @@ fun PrivacySheet(
   var urlDraft by remember { mutableStateOf(policy.searxngBaseUrl) }
   var urlError by remember { mutableStateOf<String?>(null) }
   var testResult by remember { mutableStateOf<String?>(null) }
+  var certInfo by remember { mutableStateOf<CertInfo?>(null) }
   var newTerm by remember { mutableStateOf("") }
   var showLog by remember { mutableStateOf(false) }
 
@@ -164,9 +166,15 @@ fun PrivacySheet(
               scope.launch {
                 testResult =
                   withContext(Dispatchers.IO) {
+                    certInfo = null
                     try {
                       val r = SearxngClient.search(policy.searxngBaseUrl.ifBlank { urlDraft }, "weather", "auto")
                       "Works: ${r.hits.size} results for the test query \"weather\"."
+                    } catch (e: javax.net.ssl.SSLException) {
+                      // Show the certificate so the user can decide whether to trust it.
+                      certInfo = runCatching { NetworkGate.probeSearchCertificate() }.getOrNull()
+                      "TLS failed: Android doesn't trust this server's certificate" +
+                        (certInfo?.systemError?.let { " ($it)" } ?: " (${e.message})") + "."
                     } catch (e: Exception) {
                       "Failed: ${e.message}"
                     }
@@ -179,6 +187,42 @@ fun PrivacySheet(
         }
         testResult?.let {
           Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+        }
+        certInfo?.let { c ->
+          androidx.compose.material3.Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              Text("Server certificate", style = MaterialTheme.typography.titleSmall)
+              Text("Subject: ${c.subject}", style = MaterialTheme.typography.bodySmall)
+              Text("Issuer: ${c.issuer}" + if (c.selfSigned) " (self-signed)" else "", style = MaterialTheme.typography.bodySmall)
+              Text("Valid until: ${java.text.DateFormat.getDateInstance().format(java.util.Date(c.notAfterMs))}", style = MaterialTheme.typography.bodySmall)
+              Text("SHA-256: ${c.sha256}", style = MaterialTheme.typography.labelSmall)
+              Text(
+                "Only trust it if this fingerprint matches your server (e.g. check it in Caddy, " +
+                  "Traefik or with openssl). The exception applies to this host only.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+              androidx.compose.material3.Button(
+                onClick = {
+                  NetworkGate.setSearxngPin(c.sha256)
+                  certInfo = null
+                  testResult = "Certificate trusted for this host. Test again."
+                }
+              ) {
+                Text("Trust this certificate")
+              }
+            }
+          }
+        }
+        if (policy.searxngPin.isNotEmpty()) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              "Using a certificate you trusted (${policy.searxngPin.take(11)}…)",
+              style = MaterialTheme.typography.bodySmall,
+              modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { NetworkGate.setSearxngPin("") }) { Text("Forget") }
+          }
         }
 
         SwitchRow(

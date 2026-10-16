@@ -40,6 +40,10 @@ jobs:
       - name: Install Android SDK platform 37
         run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0" > /dev/null
 
+      - name: Fetch native dependencies
+        working-directory: .
+        run: bash .github/scripts/fetch_deps.sh
+
       - name: Decode signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.PIGGSELLE_KEYSTORE_BASE64 }}
@@ -151,6 +155,10 @@ jobs:
 
       - name: Install Android SDK platform 37
         run: echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0" > /dev/null
+
+      - name: Fetch native dependencies
+        working-directory: .
+        run: bash .github/scripts/fetch_deps.sh
 
       - name: Build debug APK
         working-directory: ./Android/src

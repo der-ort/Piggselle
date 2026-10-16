@@ -1,1 +1,4 @@
 .DS_Store
+
+# Fetched by .github/scripts/fetch_deps.sh
+Android/src/app/libs/*.aar

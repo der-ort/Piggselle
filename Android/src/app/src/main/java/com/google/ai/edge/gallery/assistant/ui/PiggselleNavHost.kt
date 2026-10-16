@@ -99,6 +99,7 @@ fun PiggselleNavHost(
     }
     composable(ROUTE_SETTINGS) {
       SettingsScreen(
+        modelManagerViewModel = modelManagerViewModel,
         onBack = { navController.popBackStack() },
         onOpenModels = { navController.navigate(ROUTE_MODELS) { launchSingleTop = true } },
         vm = chatViewModel,

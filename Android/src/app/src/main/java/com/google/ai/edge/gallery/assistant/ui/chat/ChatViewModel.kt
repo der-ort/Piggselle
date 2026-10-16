@@ -22,6 +22,8 @@ import com.google.ai.edge.gallery.assistant.chat.ChatStore
 import com.google.ai.edge.gallery.assistant.data.AssistantRepository
 import com.google.ai.edge.gallery.assistant.knowledge.EmbedderManager
 import com.google.ai.edge.gallery.assistant.knowledge.KnowledgeBase
+import com.google.ai.edge.gallery.assistant.models.ModelSettingsStore
+import com.google.ai.edge.gallery.assistant.voice.WhisperManager
 import com.google.ai.edge.gallery.assistant.tools.AssistantTools
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -37,4 +39,6 @@ constructor(
   val tools: AssistantTools,
   val knowledge: KnowledgeBase,
   val embedder: EmbedderManager,
+  val modelSettings: ModelSettingsStore,
+  val whisper: WhisperManager,
 ) : ViewModel()

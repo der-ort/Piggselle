@@ -91,6 +91,8 @@ object NetworkGate {
     val killSwitch: Boolean = false,
     val enabled: Map<NetPurpose, Boolean> = defaultEnabled(),
     val searxngBaseUrl: String = "",
+    /** SHA-256 of a certificate the user chose to trust for the SearXNG host ("" = none). */
+    val searxngPin: String = "",
   ) {
     fun isEnabled(purpose: NetPurpose): Boolean =
       !killSwitch && purpose.userToggleable && (enabled[purpose] ?: false)
@@ -118,6 +120,7 @@ object NetworkGate {
             p.userToggleable && prefs.getBoolean("enabled_${p.name}", defaultEnabled()[p] ?: false)
           },
         searxngBaseUrl = prefs.getString("searxng_base_url", "") ?: "",
+        searxngPin = prefs.getString("searxng_pin", "") ?: "",
       )
     installProcessFence()
     logWriter.execute {
@@ -203,8 +206,29 @@ object NetworkGate {
 
   fun setSearxngBaseUrl(url: String) {
     val cleaned = url.trim().trimEnd('/')
+    val oldHost = HostPolicy.parseBase(_policy.value.searxngBaseUrl)?.host
+    val newHost = HostPolicy.parseBase(cleaned)?.host
     prefs.edit().putString("searxng_base_url", cleaned).apply()
     _policy.update { it.copy(searxngBaseUrl = cleaned) }
+    // A pinned certificate belongs to one host only.
+    if (oldHost != newHost) setSearxngPin("")
+  }
+
+  fun setSearxngPin(sha256: String) {
+    prefs.edit().putString("searxng_pin", sha256).apply()
+    _policy.update { it.copy(searxngPin = sha256) }
+  }
+
+  /**
+   * TLS handshake only, to show the search host's certificate when Android rejects it. Goes
+   * through the same policy check and log as any other request.
+   */
+  fun probeSearchCertificate(): CertInfo {
+    val url = _policy.value.searxngBaseUrl
+    val reason = check(url, NetPurpose.WEB_SEARCH)
+    record(url, NetPurpose.WEB_SEARCH, "TLS-PROBE", allowed = reason == null, reason = reason ?: "")
+    if (reason != null) throw BlockedRequestException(reason)
+    return TlsTrust.probe(url)
   }
 
   fun clearLog() {
@@ -235,6 +259,10 @@ object NetworkGate {
       throw BlockedRequestException(reason)
     }
     val connection = URL(url).openConnection() as HttpURLConnection
+    val pin = _policy.value.searxngPin
+    if (purpose == NetPurpose.WEB_SEARCH && pin.isNotEmpty() && connection is javax.net.ssl.HttpsURLConnection) {
+      TlsTrust.applyPin(connection, pin)
+    }
     connection.instanceFollowRedirects = false
     connection.useCaches = false
     connection.requestMethod = method

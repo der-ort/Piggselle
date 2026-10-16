@@ -86,6 +86,8 @@ import com.google.ai.edge.gallery.assistant.chat.EngineIssue
 import com.google.ai.edge.gallery.assistant.net.NetworkGate
 import com.google.ai.edge.gallery.assistant.tools.ConfirmWebSearchAction
 import com.google.ai.edge.gallery.assistant.ui.WebSearchConfirmDialog
+import com.google.ai.edge.gallery.assistant.voice.VoiceRecorder
+import com.google.ai.edge.gallery.assistant.voice.WhisperStatus
 import com.google.ai.edge.gallery.customtasks.agentchat.isWebSearchAvailable
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Model
@@ -122,6 +124,10 @@ private sealed interface ChatDialog {
   data object SystemPrompt : ChatDialog
 
   data class GemmaTerms(val model: Model) : ChatDialog
+
+  data class ModelSettings(val model: Model) : ChatDialog
+
+  data object NeedWhisper : ChatDialog
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,6 +174,36 @@ fun ChatScreen(
   var input by remember { mutableStateOf("") }
   val images = remember { mutableStateListOf<Bitmap>() }
   var menuOpen by remember { mutableStateOf(false) }
+
+  // ---- Voice ----
+  val recorder = remember { VoiceRecorder(scope) }
+  var recording by remember { mutableStateOf(false) }
+  var transcribing by remember { mutableStateOf(false) }
+  val recSeconds by recorder.seconds.collectAsState()
+  val recLevel by recorder.level.collectAsState()
+  val whisperStatus by vm.whisper.status.collectAsState()
+  val whisperReady = whisperStatus is WhisperStatus.Ready
+  val canHear = currentModel?.supportAudio == true
+
+  fun startRecording() {
+    if (!whisperReady && !canHear) {
+      dialog = ChatDialog.NeedWhisper
+      return
+    }
+    recording = recorder.start()
+  }
+
+  val micPermission =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      if (granted) startRecording()
+    }
+
+  fun onMic() {
+    val granted =
+      androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
+        android.content.pm.PackageManager.PERMISSION_GRANTED
+    if (granted) startRecording() else micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+  }
 
   // Tool side effects: web search confirmation and progress.
   LaunchedEffect(vm.tools.receiveActionChannel) {
@@ -256,6 +292,7 @@ fun ChatScreen(
               loading = loadingModel,
               onSelect = { engine.selectModel(it) },
               onManage = onOpenModels,
+              onSettings = { currentModel?.let { dialog = ChatDialog.ModelSettings(it) } },
             )
             Box {
               IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Chat options") }
@@ -297,6 +334,42 @@ fun ChatScreen(
             )
             Spacer(Modifier.height(6.dp))
           }
+          if (recording || transcribing) {
+            RecordingBar(
+              seconds = recSeconds,
+              level = recLevel,
+              busy = transcribing,
+              canTranscribe = whisperReady,
+              canSendAudio = canHear,
+              onCancel = {
+                scope.launch {
+                  recorder.cancel()
+                  recording = false
+                }
+              },
+              onTranscribe = {
+                scope.launch {
+                  val rec = recorder.stop()
+                  recording = false
+                  if (rec != null) {
+                    transcribing = true
+                    val text = vm.whisper.transcribe(rec.floatSamples())
+                    transcribing = false
+                    if (!text.isNullOrBlank()) input = if (input.isBlank()) text else "$input $text"
+                  }
+                }
+              },
+              onSendAudio = {
+                scope.launch {
+                  val rec = recorder.stop()
+                  recording = false
+                  if (rec != null) engine.send(input, images.toList(), audioWav = rec.wav())
+                  input = ""
+                  images.clear()
+                }
+              },
+            )
+          } else
           ChatInputBar(
             text = input,
             onTextChange = { input = it },
@@ -320,6 +393,7 @@ fun ChatScreen(
               images.clear()
             },
             onStop = { engine.stop() },
+            onMic = { onMic() },
           )
         }
       },
@@ -420,7 +494,14 @@ fun ChatScreen(
         onSave = { f ->
           if (d.isNew) {
             val created = store.createFolder(f.name)
-            store.updateFolder(created.copy(systemPrompt = f.systemPrompt, useKnowledge = f.useKnowledge))
+            store.updateFolder(
+              created.copy(
+                systemPrompt = f.systemPrompt,
+                useKnowledge = f.useKnowledge,
+                temperature = f.temperature,
+                thinking = f.thinking,
+              )
+            )
           } else {
             store.updateFolder(f)
           }
@@ -449,6 +530,26 @@ fun ChatScreen(
           dialog = null
         },
         onCancel = { dialog = null },
+      )
+    is ChatDialog.ModelSettings ->
+      com.google.ai.edge.gallery.assistant.ui.settings.ModelSettingsSheet(
+        model = d.model,
+        settings = vm.modelSettings,
+        onApply = { values -> engine.applyModelSettings(d.model, values) },
+        onDismiss = { dialog = null },
+      )
+    ChatDialog.NeedWhisper ->
+      AlertDialog(
+        onDismissRequest = { dialog = null },
+        title = { Text("Voice input needs Whisper") },
+        text = {
+          Text(
+            "This model can't listen to audio, so speech has to be turned into text first. Download a " +
+              "Whisper model (runs on this phone) in Settings → Voice input."
+          )
+        },
+        confirmButton = { Button(onClick = { dialog = null; onOpenSettings() }) { Text("Open settings") } },
+        dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
       )
     null -> {}
   }

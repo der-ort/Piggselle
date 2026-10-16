@@ -43,6 +43,10 @@ data class ChatFolder(
   val systemPrompt: String = "",
   /** Knowledge base default for chats in this folder. Null: use the global default. */
   val useKnowledge: Boolean? = null,
+  /** Sampling temperature for chats in this folder. Null: the model's setting. */
+  val temperature: Float? = null,
+  /** Thinking mode for chats in this folder (models that support it). Null: the model's setting. */
+  val thinking: Boolean? = null,
   val createdAtMs: Long = System.currentTimeMillis(),
 )
 

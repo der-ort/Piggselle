@@ -47,6 +47,9 @@ import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -236,6 +239,7 @@ fun ChatInputBar(
   placeholder: String,
   onSend: () -> Unit,
   onStop: () -> Unit,
+  onMic: (() -> Unit)? = null,
 ) {
   Surface(tonalElevation = 2.dp, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth()) {
     Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
@@ -281,7 +285,11 @@ fun ChatInputBar(
               disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
         )
-        if (generating) {
+        if (onMic != null && !generating && text.isBlank() && images.isEmpty()) {
+          FilledIconButton(onClick = onMic, enabled = enabled, modifier = Modifier.padding(4.dp)) {
+            Icon(Icons.Rounded.Mic, contentDescription = "Voice input")
+          }
+        } else if (generating) {
           FilledIconButton(onClick = onStop, modifier = Modifier.padding(4.dp)) {
             Icon(Icons.Rounded.Stop, contentDescription = "Stop")
           }
@@ -299,6 +307,60 @@ fun ChatInputBar(
   }
 }
 
+// ---- Voice ----------------------------------------------------------------------------------------
+
+@Composable
+fun RecordingBar(
+  seconds: Float,
+  level: Float,
+  busy: Boolean,
+  canTranscribe: Boolean,
+  canSendAudio: Boolean,
+  onCancel: () -> Unit,
+  onTranscribe: () -> Unit,
+  onSendAudio: () -> Unit,
+) {
+  Surface(
+    tonalElevation = 2.dp,
+    shape = RoundedCornerShape(28.dp),
+    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
+      IconButton(onClick = onCancel, enabled = !busy) { Icon(Icons.Rounded.Close, contentDescription = "Discard recording") }
+      if (busy) {
+        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        Spacer(Modifier.width(8.dp))
+        Text("Transcribing…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+      } else {
+        Box(
+          Modifier.size((10 + 14 * level.coerceIn(0f, 1f)).dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.error)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+          "%d:%02d".format(seconds.toInt() / 60, seconds.toInt() % 60),
+          style = MaterialTheme.typography.bodyLarge,
+          modifier = Modifier.weight(1f),
+        )
+      }
+      if (canSendAudio) {
+        TextButton(onClick = onSendAudio, enabled = !busy) {
+          Icon(Icons.Rounded.GraphicEq, contentDescription = null, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(4.dp))
+          Text("Send audio")
+        }
+      }
+      if (canTranscribe) {
+        FilledIconButton(onClick = onTranscribe, enabled = !busy, modifier = Modifier.padding(4.dp)) {
+          Icon(Icons.Rounded.Check, contentDescription = "Transcribe to text")
+        }
+      }
+    }
+  }
+}
+
 // ---- Model picker ---------------------------------------------------------------------------------
 
 @Composable
@@ -308,6 +370,7 @@ fun ModelPickerButton(
   loading: Boolean,
   onSelect: (Model) -> Unit,
   onManage: () -> Unit,
+  onSettings: (() -> Unit)? = null,
 ) {
   var open by remember { mutableStateOf(false) }
   Box {
@@ -341,6 +404,9 @@ fun ModelPickerButton(
         )
       }
       if (models.isNotEmpty()) HorizontalDivider()
+      if (current != null && onSettings != null) {
+        DropdownMenuItem(text = { Text("Settings for this model…") }, onClick = { open = false; onSettings() })
+      }
       DropdownMenuItem(text = { Text("Download & manage models…") }, onClick = { open = false; onManage() })
     }
   }
