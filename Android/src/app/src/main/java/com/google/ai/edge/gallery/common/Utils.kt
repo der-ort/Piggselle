@@ -414,6 +414,10 @@ fun isPixel11(): Boolean {
  */
 fun getModelStorageDir(context: Context): File {
   val isCd1aBuild = Build.ID != null && Build.ID.startsWith("CD1A")
+  // Piggselle: an optional shared folder that survives reinstalls.
+  com.google.ai.edge.gallery.assistant.models.ModelFolder.sharedDirOrNull(context)?.let {
+    return it
+  }
   return if (isPixel11() && isCd1aBuild) {
     context.filesDir
   } else {

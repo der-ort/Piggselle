@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.FolderShared
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
@@ -68,6 +69,7 @@ private enum class Sheet {
   ABOUT,
   VOICE,
   MODEL_PICK,
+  MODEL_FOLDER,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,6 +131,15 @@ fun SettingsScreen(
       }
       item { SettingRow(Icons.Outlined.Memory, "Models", "Download, import from Hugging Face, delete") { onOpenModels() } }
       item {
+        val folder =
+          when (val s = com.google.ai.edge.gallery.assistant.models.ModelFolder.state(context)) {
+            com.google.ai.edge.gallery.assistant.models.ModelFolderState.Private -> "App storage (deleted on uninstall)"
+            is com.google.ai.edge.gallery.assistant.models.ModelFolderState.Shared -> s.dir.absolutePath
+            is com.google.ai.edge.gallery.assistant.models.ModelFolderState.Unavailable -> "Shared folder unavailable"
+          }
+        SettingRow(Icons.Outlined.FolderShared, "Models folder", folder) { sheet = Sheet.MODEL_FOLDER }
+      }
+      item {
         SettingRow(Icons.Outlined.Tune, "Model settings", "Temperature, context length, accelerator, thinking") {
           sheet = Sheet.MODEL_PICK
         }
@@ -172,6 +183,7 @@ fun SettingsScreen(
       KnowledgeSheet(vm.knowledge, vm.embedder, onDismiss = { sheet = null }, onChanged = { vm.engine.settingsChanged() })
     Sheet.PRIVACY -> PrivacySheet(vm.repository, onDismiss = { sheet = null }, onWebSearchChanged = { vm.engine.settingsChanged() })
     Sheet.VOICE -> VoiceSheet(vm.whisper, onDismiss = { sheet = null })
+    Sheet.MODEL_FOLDER -> ModelFolderSheet(onDismiss = { sheet = null })
     Sheet.MODEL_PICK -> {
       val models = vm.engine.downloadedChatModels(modelManagerViewModel)
       androidx.compose.material3.AlertDialog(

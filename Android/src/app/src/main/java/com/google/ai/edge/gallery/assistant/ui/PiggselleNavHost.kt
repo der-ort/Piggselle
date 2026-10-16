@@ -20,6 +20,8 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +69,12 @@ fun PiggselleNavHost(
     }
     lifecycleOwner.lifecycle.addObserver(observer)
     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
+
+  // Something shared from another app opens in the chat screen.
+  val shared by com.google.ai.edge.gallery.assistant.share.ShareInbox.pending.collectAsState()
+  LaunchedEffect(shared) {
+    if (shared != null) navController.popBackStack(ROUTE_CHAT, inclusive = false)
   }
 
   NavHost(

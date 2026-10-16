@@ -731,6 +731,8 @@ constructor(
         importedModels.removeAt(importedModelIndex)
       }
       dataStoreRepository.saveImportedModels(importedModels = importedModels)
+    com.google.ai.edge.gallery.assistant.models.ModelFolder.writeManifest(context, importedModels)
+      com.google.ai.edge.gallery.assistant.models.ModelFolder.writeManifest(context, importedModels)
     }
     _uiState.update { currentState ->
       val curModelDownloadStatus = currentState.modelDownloadStatus.toMutableMap()
@@ -1088,6 +1090,7 @@ constructor(
     }
     importedModels.add(info)
     dataStoreRepository.saveImportedModels(importedModels = importedModels)
+    com.google.ai.edge.gallery.assistant.models.ModelFolder.writeManifest(context, importedModels)
   }
 
   fun getTokenStatusAndData(): TokenStatusAndData {
@@ -1579,8 +1582,14 @@ constructor(
           }
     }
 
-    // Load imported models.
-    for (importedModel in dataStoreRepository.readImportedModels()) {
+    // Load imported models, plus any found in the shared models folder (Piggselle).
+    val storedImports = dataStoreRepository.readImportedModels()
+    val allImports = com.google.ai.edge.gallery.assistant.models.ModelFolder.discover(context, storedImports)
+    if (allImports.size != storedImports.size) {
+      dataStoreRepository.saveImportedModels(importedModels = allImports)
+      com.google.ai.edge.gallery.assistant.models.ModelFolder.writeManifest(context, allImports)
+    }
+    for (importedModel in allImports) {
       Log.d(TAG, "stored imported model: $importedModel")
 
       // Create model.

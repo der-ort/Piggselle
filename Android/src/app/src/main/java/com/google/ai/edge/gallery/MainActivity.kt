@@ -84,12 +84,8 @@ class MainActivity : ComponentActivity(), VirtualDevicePermissionsHost {
     super.onCreate(null)
     com.google.ai.edge.gallery.assistant.CrashReporter.showIfPresent(this)
 
-    // Debug: Dump all intent extras to see what FCM unloads
-    intent.extras?.let { extras ->
-      for (key in extras.keySet()) {
-        Log.d(TAG, "onCreate Extra -> Key: $key, Value: ${extras.get(key)}")
-      }
-    }
+    // Piggselle: shared text, images and files go into a new chat (never logged).
+    com.google.ai.edge.gallery.assistant.share.ShareInbox.accept(this, intent)
 
     // Convert FCM Console data extras to intent data for GalleryNavGraph to pick up
     intent.getStringExtra("deeplink")?.let { link ->
@@ -198,12 +194,7 @@ class MainActivity : ComponentActivity(), VirtualDevicePermissionsHost {
     super.onNewIntent(intent)
     setIntent(intent)
 
-    // Debug: Dump all intent extras to see what FCM unloads
-    intent.extras?.let { extras ->
-      for (key in extras.keySet()) {
-        Log.d(TAG, "onNewIntent Extra -> Key: $key, Value: ${extras.get(key)}")
-      }
-    }
+    com.google.ai.edge.gallery.assistant.share.ShareInbox.accept(this, intent)
 
     intent.getStringExtra("deeplink")?.let { link ->
       Log.d(TAG, "onNewIntent: Found deeplink extra: $link")

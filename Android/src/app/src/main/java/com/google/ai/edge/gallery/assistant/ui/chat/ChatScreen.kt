@@ -226,6 +226,24 @@ fun ChatScreen(
       }
     }
 
+  // "Share to Piggselle": start a new chat with the shared content in the message box.
+  val shared by com.google.ai.edge.gallery.assistant.share.ShareInbox.pending.collectAsState()
+  LaunchedEffect(shared) {
+    val content = com.google.ai.edge.gallery.assistant.share.ShareInbox.take() ?: return@LaunchedEffect
+    drawerState.close()
+    engine.newChat()
+    input = content.text
+    images.clear()
+    if (currentModel?.supportImage == true) {
+      images.addAll(content.images.take(4))
+    } else if (content.images.isNotEmpty()) {
+      android.widget.Toast.makeText(context, "The current model can't see images, so they were left out.", android.widget.Toast.LENGTH_LONG).show()
+    }
+    if (content.skipped > 0) {
+      android.widget.Toast.makeText(context, "${content.skipped} shared item(s) couldn't be used.", android.widget.Toast.LENGTH_SHORT).show()
+    }
+  }
+
   BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
 
   fun closeDrawer() = scope.launch { drawerState.close() }
@@ -626,7 +644,7 @@ private fun EmptyChat(
   }
 }
 
-private fun decodeScaled(context: android.content.Context, uri: Uri, maxSide: Int = 1024): Bitmap? =
+internal fun decodeScaled(context: android.content.Context, uri: Uri, maxSide: Int = 1024): Bitmap? =
   try {
     val source = ImageDecoder.createSource(context.contentResolver, uri)
     ImageDecoder.decodeBitmap(source) { decoder, info, _ ->

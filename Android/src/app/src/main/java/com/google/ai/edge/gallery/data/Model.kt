@@ -295,8 +295,12 @@ data class Model(
 
   fun getPath(context: Context, fileName: String = downloadInfo.downloadFileName): String {
     if (downloadInfo.imported) {
-      return listOf(getModelStorageDir(context).absolutePath, IMPORTS_DIR, fileName)
-        .joinToString(File.separator)
+      val root = getModelStorageDir(context)
+      val inImports = File(root, listOf(IMPORTS_DIR, fileName).joinToString(File.separator))
+      // Piggselle: model files dropped straight into the shared folder are used in place.
+      val loose = File(root, fileName)
+      if (!inImports.exists() && loose.isFile) return loose.absolutePath
+      return inImports.absolutePath
     }
 
     if (downloadInfo.localModelFilePathOverride.isNotEmpty()) {

@@ -67,7 +67,7 @@ sealed interface EmbedderStatus {
 @Singleton
 class EmbedderManager @Inject constructor(@ApplicationContext private val context: Context) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  private val dir = File(context.filesDir, "embedder").apply { mkdirs() }
+  private val dir = com.google.ai.edge.gallery.assistant.models.ModelFolder.helperDir(context, "embedder")
   private val modelFile = File(dir, MODEL_FILE)
   private val partFile = File(dir, "$MODEL_FILE.part")
   private val engineLock = Mutex()

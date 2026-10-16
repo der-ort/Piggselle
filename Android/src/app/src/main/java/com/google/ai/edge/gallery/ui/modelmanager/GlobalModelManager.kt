@@ -321,6 +321,9 @@ fun GlobalModelManager(
             .fillMaxWidth()
             .padding(top = innerPadding.calculateTopPadding())
       ) {
+        if (isLoadingModelCardDetails) {
+          androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
 
         LazyColumn(
           modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -330,6 +333,7 @@ fun GlobalModelManager(
         ) {
           val showSupplementaryTab = false
           if (!showSupplementaryTab) {
+            item(key = "google_label") { SectionLabel("Gemma and other models from Google", top = 0.dp) }
             items(builtInModels) { model ->
               val expanded = modelItemExpandedStates.getOrDefault(model.name, true)
               ModelItem(
@@ -375,6 +379,61 @@ fun GlobalModelManager(
                 showBenchmarkActionButton = false,
                 tosViewModel = tosViewModel,
               )
+            }
+
+            // Piggselle: community models and Hugging Face search.
+            item(key = "community_label") { SectionLabel("More models from Hugging Face") }
+            item(key = "hf_search") {
+              com.google.ai.edge.gallery.assistant.models.SuggestedModelCard(
+                model =
+                  com.google.ai.edge.gallery.assistant.models.SuggestedModel(
+                    repo = "",
+                    name = "Search all LiteRT models",
+                    note = "Browse every .litertlm model on Hugging Face, or paste a link",
+                    group = "",
+                  ),
+                downloaded = false,
+                onClick = { showHfExploreScreen = true },
+              )
+            }
+            val groups = com.google.ai.edge.gallery.assistant.models.SUGGESTED_MODELS.groupBy { it.group }
+            groups.forEach { (group, list) ->
+              item(key = "group_$group") {
+                Column {
+                  SectionLabel(group, top = 16.dp)
+                  com.google.ai.edge.gallery.assistant.models.SUGGESTED_GROUP_NOTES[group]?.let {
+                    Text(
+                      it,
+                      style = MaterialTheme.typography.bodySmall,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp),
+                    )
+                  }
+                }
+              }
+              items(list, key = { "suggested_${it.repo}" }) { suggested ->
+                val downloaded = importedModels.any { it.downloadInfo.url.contains("/${suggested.repo}/") }
+                com.google.ai.edge.gallery.assistant.models.SuggestedModelCard(
+                  model = suggested,
+                  downloaded = downloaded,
+                  onClick = {
+                    if (!isLoadingModelCardDetails) {
+                      isLoadingModelCardDetails = true
+                      viewModel.fetchModelDetails(suggested.repo) { detailed ->
+                        isLoadingModelCardDetails = false
+                        if (detailed != null) {
+                          selectedModelForDetails = detailed
+                          showModelDetailsSheet = true
+                        } else {
+                          unsupportedModelErrorMessage =
+                            "Couldn't load ${suggested.repo}. Check that model catalog access is on in Privacy settings."
+                          showUnsupportedModelDialog = true
+                        }
+                      }
+                    }
+                  },
+                )
+              }
             }
           }
         }
@@ -504,7 +563,7 @@ fun GlobalModelManager(
               scope.launch {
                 delay(200)
                 showImportModelSheet = false
-                showHuggingFaceUrlDialog = true
+                showHfExploreScreen = true
               }
             }
             .semantics {
@@ -668,4 +727,14 @@ private fun getFileName(context: Context, uri: Uri): String? {
     return uri.lastPathSegment
   }
   return null
+}
+
+@Composable
+private fun SectionLabel(text: String, top: androidx.compose.ui.unit.Dp = 24.dp) {
+  Text(
+    text,
+    color = MaterialTheme.colorScheme.onSurface,
+    style = MaterialTheme.typography.labelLarge,
+    modifier = Modifier.semantics { heading() }.padding(horizontal = 16.dp).padding(top = top, bottom = 8.dp),
+  )
 }

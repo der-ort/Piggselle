@@ -60,7 +60,14 @@ crashed() {
 report_and_fail() {
   echo "::error title=Smoke test::App crashed during: $1"
   head -40 "$OUT/crash.txt" | while IFS= read -r l; do echo "::error title=Crash::$l"; done
-  adb exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
+  # Share text from "another app": it should land in a new chat's message box, unsent.
+LAST_STEP="share text"
+adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "Shared-hello-42" -n "$PKG/com.google.ai.edge.gallery.MainActivity" > /dev/null
+sleep 4
+crashed && report_and_fail "receiving a share"
+expect_text "Shared-hello-42"
+
+adb exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
   exit 1
 }
 
@@ -117,6 +124,10 @@ expect_text "Download a model to start"
 tap_text "Browse models"
 sleep 5
 crashed && report_and_fail "opening the model manager"
+# Scroll down to the community suggestions.
+SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1); W=${SIZE%x*}; H=${SIZE#*x}
+for _ in 1 2 3 4 5 6 7 8; do adb shell input swipe $((W/2)) $((H*3/4)) $((W/2)) $((H/4)) 300; sleep 1; has_text "More models from Hugging Face" && break; done
+expect_text "More models from Hugging Face"
 adb shell input keyevent KEYCODE_BACK
 sleep 3
 crashed && report_and_fail "returning from the model manager"
@@ -142,6 +153,13 @@ sleep 3
 crashed && report_and_fail "opening the knowledge base sheet"
 adb shell input keyevent KEYCODE_BACK
 sleep 2
+expect_text "Models folder"
+tap_text "Models folder"
+sleep 3
+crashed && report_and_fail "opening the models folder sheet"
+expect_text "Open access settings"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
 adb shell input keyevent KEYCODE_BACK
 sleep 3
 crashed && report_and_fail "going back to the chat"
@@ -151,4 +169,4 @@ if ! adb shell pidof "$PKG" > /dev/null; then
   echo "::error title=Smoke test::App process is not running at the end"
   exit 1
 fi
-echo "::notice title=Smoke test::Terms, chat, model manager, drawer, folder dialog, settings and knowledge sheet work without crashing"
+echo "::notice title=Smoke test::Terms, chat, model manager with suggestions, drawer, folder dialog, settings, knowledge and models-folder sheets, and sharing text work without crashing"

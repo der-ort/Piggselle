@@ -83,7 +83,7 @@ sealed interface WhisperStatus {
 class WhisperManager @Inject constructor(@ApplicationContext private val context: Context) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-  private val root = File(context.filesDir, "whisper").apply { mkdirs() }
+  private val root = com.google.ai.edge.gallery.assistant.models.ModelFolder.helperDir(context, "whisper")
   private val lock = Mutex()
   private var recognizer: OfflineRecognizer? = null
   private var recognizerKey: String? = null

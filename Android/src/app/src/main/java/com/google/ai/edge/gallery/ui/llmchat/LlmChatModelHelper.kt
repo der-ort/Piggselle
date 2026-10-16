@@ -156,6 +156,9 @@ object LlmChatModelHelper : LlmModelHelper {
         cacheDir =
           if (modelPath.startsWith("/data/local/tmp"))
             context.getExternalFilesDir(null)?.absolutePath
+          // Piggselle: keep compiled caches out of the shared models folder.
+          else if (!modelPath.contains("/Android/data/${context.packageName}") && !modelPath.startsWith(context.filesDir.absolutePath))
+            java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "litert-cache").apply { mkdirs() }.absolutePath
           else null,
       )
 

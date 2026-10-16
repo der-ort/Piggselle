@@ -35,8 +35,8 @@ android {
     applicationId = "io.github.derort.piggselle"
     minSdk = 31
     targetSdk = 37
-    versionCode = 5
-    versionName = "0.3.1"
+    versionCode = 6
+    versionName = "0.4.0"
 
     // Needed for HuggingFace auth workflows.
     // Use the scheme of the "Redirect URLs" in HuggingFace app.
@@ -117,6 +117,8 @@ dependencies {
   implementation(libs.litertlm)
   // sherpa-onnx for offline Whisper; fetched and hash-checked by .github/scripts/fetch_deps.sh.
   implementation(files("libs/sherpa-onnx-1.13.8.aar"))
+  // Clean restart after changing the models folder (Apache-2.0).
+  implementation("com.jakewharton:process-phoenix:3.0.0")
   implementation(libs.commonmark)
   implementation(libs.richtext)
   implementation(libs.camerax.core)
